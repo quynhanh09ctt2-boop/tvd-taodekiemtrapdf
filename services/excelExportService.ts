@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Submission, Room } from '../types';
-import { formatScore } from './scoringService';
+import { formatScore } from '../services/scoringService';
 
 /**
  * Xuất danh sách kết quả nộp bài của học sinh ra file Excel
