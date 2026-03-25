@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { ExamData, Question, QuestionOption } from './types';
+import { ExamData, Question, QuestionOption } from '../types';
 
 export interface ImageData {
   id: string;
