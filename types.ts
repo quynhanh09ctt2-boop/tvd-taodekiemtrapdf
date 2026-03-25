@@ -51,6 +51,16 @@ export interface ExamPointsConfig {
   autoBalance?: boolean;
 }
 
+// Interface dùng cho kết quả parse từ Word và Export HTML
+export interface ExamData {
+  title: string;
+  description?: string;
+  questions: Question[];
+  totalQuestions: number;
+  answers?: { [key: number]: any }; // Đáp án tham chiếu nếu có
+  pointsConfig?: ExamPointsConfig;
+}
+
 export interface Exam {
   id: string;
   title: string;
@@ -80,6 +90,7 @@ export interface Room {
     showResults: boolean;
     allowReview: boolean;
     maxAttempts: number;
+    pdfUrl?: string; // Hỗ trợ chế độ thi PDF
     [key: string]: any;
   };
 }
@@ -92,31 +103,37 @@ export interface StudentInfo {
   className?: string;
 }
 
+export interface ScoreBreakdown {
+  multipleChoice: { correct: number; total: number; points: number };
+  trueFalse: { correct: number; total: number; points: number };
+  shortAnswer: { correct: number; total: number; points: number };
+}
+
 export interface Submission {
   id: string;
   roomId: string;
   examId: string;
   student: StudentInfo;
   answers: { [key: number]: any };
-  score: number;
-  totalScore: number;
+  score: number;        // Điểm thô
+  totalScore: number;   // Điểm sau khi quy đổi thang 10
   percentage: number;
   correctCount: number;
   wrongCount: number;
   totalQuestions: number;
   duration: number;
   submittedAt: any;
-  scoreBreakdown?: any;
   tabSwitchCount?: number;
+  scoreBreakdown: ScoreBreakdown; // Bắt buộc phải có cho Excel Export
 }
 
 export interface User {
-  id: string;
-  name: string;
+  uid: string;
   email?: string;
-  avatar?: string;
+  displayName?: string;
+  photoURL?: string;
   role: Role;
-  isApproved?: boolean;
-  createdAt?: any;
-  classIds?: string[];
+  isApproved: boolean;
+  className?: string;
+  username?: string; // Dùng cho tài khoản học sinh
 }
