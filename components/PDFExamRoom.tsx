@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Room, Exam, StudentInfo, Submission } from './types';
+import { Room, Exam, StudentInfo, Submission } from '../types';
 import {
   ensureSignedIn,
   createSubmission,
   submitExam,
   subscribeToRoom,
-} from './firebaseService';
+} from '../services/firebaseService';
 
 type MCAnswers = { [n: number]: string };
 type TFAnswers = { [n: number]: string[] };
