@@ -11,7 +11,7 @@ import {
   approveUser,
   doc,
   updateDoc
-} from './firebaseService'; // Đã chỉnh sửa đường dẫn cho khớp với file bạn gửi
+} from './services/firebaseService'; // SỬA: Thêm /services/ vào đường dẫn
 import * as XLSX from 'xlsx';
 
 interface PendingUser extends User {
@@ -39,31 +39,31 @@ const AdminPanel: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       where("role", "in", [Role.TEACHER, Role.MEMBER]),
       where("isApproved", "==", false)
     );
-    const unsubPending = onSnapshot(pendingQuery, (snapshot) => {
-      const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PendingUser));
-      setPendingUsers(users);
-      setLoading(false);
-    });
-
+    
     // Lấy danh sách giáo viên đã duyệt
     const approvedQuery = query(
       collection(db, "users"), 
       where("role", "in", [Role.TEACHER, Role.MEMBER]),
       where("isApproved", "==", true)
     );
-    const unsubApproved = onSnapshot(approvedQuery, (snapshot) => {
-      const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PendingUser));
-      setApprovedUsers(users);
-    });
 
     // Lấy danh sách học sinh
-    const studentQuery = query(
+    const studentsQuery = query(
       collection(db, "users"), 
       where("role", "==", Role.STUDENT)
     );
-    const unsubStudents = onSnapshot(studentQuery, (snapshot) => {
-      const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PendingUser));
-      setStudents(users);
+
+    const unsubPending = onSnapshot(pendingQuery, (snapshot) => {
+      setPendingUsers(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as PendingUser)));
+      setLoading(false);
+    });
+
+    const unsubApproved = onSnapshot(approvedQuery, (snapshot) => {
+      setApprovedUsers(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as PendingUser)));
+    });
+
+    const unsubStudents = onSnapshot(studentsQuery, (snapshot) => {
+      setStudents(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as PendingUser)));
     });
 
     return () => {
@@ -73,34 +73,11 @@ const AdminPanel: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     };
   }, []);
 
-  const handleApprove = async (userId: string) => {
-    try {
-      await approveUser(userId);
-      alert('Đã duyệt tài khoản thành công!');
-    } catch (error) {
-      console.error(error);
-      alert('Lỗi khi duyệt tài khoản');
-    }
-  };
-
-  const handleReject = async (userId: string) => {
-    if (window.confirm('Bạn có chắc chắn muốn xóa yêu cầu này?')) {
-      try {
-        await rejectUser(userId);
-      } catch (error) {
-        console.error(error);
-        alert('Lỗi khi xóa tài khoản');
-      }
-    }
-  };
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsImporting(true);
-    setImportLog(null);
-
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
@@ -112,157 +89,134 @@ const AdminPanel: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         
         const result = await importStudentsFromExcel(data);
         setImportLog(result);
-        alert(`Đã nhập xong: ${result.success} thành công, ${result.errors.length} lỗi.`);
-      } catch (err) {
-        alert('Lỗi khi đọc file Excel');
+        alert(`Đã nhập xong: ${result.success} học sinh thành công!`);
+      } catch (error) {
+        alert("Lỗi khi đọc file Excel");
       } finally {
         setIsImporting(false);
-        e.target.value = '';
       }
     };
     reader.readAsBinaryString(file);
   };
 
-  const renderUserList = (users: PendingUser[]) => {
-    if (users.length === 0) {
-      return (
-        <div className="py-12 text-center text-gray-400">
-          Không có dữ liệu hiển thị
-        </div>
-      );
-    }
-
-    return (
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-100">
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Thông tin</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase">Vai trò / Lớp</th>
-              <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase text-right">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="font-bold text-gray-800">{user.name}</div>
-                  <div className="text-sm text-gray-500">{user.email || user.username}</div>
+  const renderUserList = (users: PendingUser[]) => (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left border-collapse">
+        <thead>
+          <tr className="bg-gray-50 border-b border-gray-100">
+            <th className="p-4 font-semibold text-gray-600">Tên/Tài khoản</th>
+            <th className="p-4 font-semibold text-gray-600">Lớp/Email</th>
+            <th className="p-4 font-semibold text-gray-600">Vai trò</th>
+            <th className="p-4 font-semibold text-gray-600 text-right">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.length === 0 ? (
+            <tr><td colSpan={4} className="p-10 text-center text-gray-400">Trống</td></tr>
+          ) : (
+            users.map(user => (
+              <tr key={user.uid} className="border-b border-gray-50 hover:bg-teal-50/30 transition-colors">
+                <td className="p-4">
+                  <p className="font-medium text-gray-800">{user.displayName || user.name}</p>
+                  <p className="text-xs text-gray-500">{user.username || user.email}</p>
                 </td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${
-                    user.role === Role.STUDENT ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'
-                  }`}>
-                    {user.role === Role.STUDENT ? `Lớp: ${user.className}` : user.role}
+                <td className="p-4">
+                  <span className="text-sm text-gray-600">{user.className || user.email}</span>
+                </td>
+                <td className="p-4">
+                  <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-xs uppercase font-bold">
+                    {user.role}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex justify-end gap-2">
-                    {activeTab === 'pending' && (
-                      <button
-                        onClick={() => handleApprove(user.id)}
-                        className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
-                        title="Duyệt"
-                      >
-                        Duyệt
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleReject(user.id)}
-                      className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
-                      title="Xóa"
-                    >
-                      Xóa
-                    </button>
-                  </div>
+                <td className="p-4 text-right space-x-2">
+                  {activeTab === 'pending' ? (
+                    <>
+                      <button 
+                        onClick={() => approveUser(user.uid)}
+                        className="px-3 py-1 bg-teal-500 text-white rounded-lg text-sm hover:bg-teal-600"
+                      >Duyệt</button>
+                      <button 
+                        onClick={() => rejectUser(user.uid)}
+                        className="px-3 py-1 bg-red-100 text-red-600 rounded-lg text-sm hover:bg-red-200"
+                      >Từ chối</button>
+                    </>
+                  ) : (
+                    <button 
+                      onClick={() => {
+                        const newClass = prompt("Nhập lớp mới:", user.className);
+                        if (newClass !== null) updateDoc(doc(db, "users", user.uid), { className: newClass });
+                      }}
+                      className="text-teal-600 hover:underline text-sm"
+                    >Sửa lớp</button>
+                  )}
                 </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  };
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Quản trị hệ thống</h1>
-          <p className="text-gray-500 mt-1">Quản lý người dùng và phê duyệt tài khoản</p>
-        </div>
-        <button 
-          onClick={onBack}
-          className="px-5 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition-all shadow-sm font-medium"
-        >
-          ← Quay lại
-        </button>
-      </div>
-
-      <div className="bg-white rounded-3xl shadow-xl shadow-teal-500/5 border border-gray-100 overflow-hidden">
-        <div className="flex border-b border-gray-100 p-2 bg-gray-50/50">
-          {[
-            { id: 'pending', label: 'Chờ duyệt', count: pendingUsers.length },
-            { id: 'approved', label: 'Đã duyệt', count: approvedUsers.length },
-            { id: 'students', label: 'Học sinh', count: students.length }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-bold transition-all ${
-                activeTab === tab.id 
-                  ? 'bg-white text-teal-600 shadow-sm ring-1 ring-black/5' 
-                  : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              {tab.label}
-              {tab.count > 0 && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                  activeTab === tab.id ? 'bg-teal-100 text-teal-600' : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {tab.count}
-                </span>
-              )}
+    <div className="min-h-screen bg-white p-4 md:p-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <button onClick={onBack} className="text-teal-600 mb-2 flex items-center gap-1 hover:underline">
+              ← Quay lại
             </button>
-          ))}
-        </div>
+            <h1 className="text-3xl font-bold text-gray-900">Quản trị hệ thống</h1>
+          </div>
 
-        <div className="p-6">
           {activeTab === 'students' && (
-            <div className="mb-6 p-4 bg-teal-50 rounded-2xl border border-teal-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-sm text-teal-800">
-                <strong>Nhập học sinh:</strong> Tải file Excel (.xlsx) chứa cột <strong>name, username, password, className</strong>.
-              </div>
-              <label className={`cursor-pointer px-6 py-2.5 bg-teal-600 text-white rounded-xl font-bold shadow-lg shadow-teal-200 hover:bg-teal-700 transition-all ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
-                {isImporting ? 'Đang xử lý...' : 'Chọn file Excel'}
+            <div className="flex items-center gap-2">
+              <label className={`cursor-pointer bg-teal-600 text-white px-4 py-2 rounded-xl font-medium shadow-lg shadow-teal-200 hover:bg-teal-700 transition-all ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
+                {isImporting ? 'Đang xử lý...' : 'Nhập file Excel'}
                 <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
               </label>
             </div>
           )}
+        </div>
 
+        <div className="flex border-b border-gray-100 mb-6 overflow-x-auto">
+          {[
+            { id: 'pending', label: 'Chờ duyệt', count: pendingUsers.length },
+            { id: 'approved', label: 'Giáo viên', count: approvedUsers.length },
+            { id: 'students', label: 'Học sinh', count: students.length }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`px-6 py-4 text-sm font-medium transition-all relative whitespace-nowrap ${
+                activeTab === tab.id ? 'text-teal-600' : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              {tab.label} ({tab.count})
+              {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-1 bg-teal-500 rounded-full" />}
+            </button>
+          ))}
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center gap-4">
               <div className="animate-spin rounded-full h-10 w-10 border-4 border-teal-500 border-t-transparent"></div>
-              <p className="text-gray-500">Đang tải dữ liệu...</p>
+              <p className="text-gray-500">Đang tải dữ và phân tích...</p>
             </div>
-          ) : (
-            <div className="bg-white rounded-2xl border border-gray-100">
-              {activeTab === 'pending' ? renderUserList(pendingUsers) : 
-               activeTab === 'approved' ? renderUserList(approvedUsers) : 
-               renderUserList(students)}
-            </div>
-          )}
-
-          {importLog && (
-            <div className="mt-6 p-4 bg-gray-50 rounded-xl text-xs overflow-auto max-h-40 border border-gray-200">
-              <p className="font-bold mb-2">Kết quả nhập file:</p>
-              <p className="text-green-600">- Thành công: {importLog.success}</p>
-              {importLog.errors.map((err, i) => (
-                <p key={i} className="text-red-500">- {err}</p>
-              ))}
-            </div>
+          ) : renderUserList(
+            activeTab === 'pending' ? pendingUsers : 
+            activeTab === 'approved' ? approvedUsers : students
           )}
         </div>
+
+        {importLog && (
+          <div className="mt-6 p-4 bg-gray-50 rounded-xl text-xs border border-gray-200 max-h-40 overflow-auto">
+            <p className="font-bold text-teal-700">Kết quả nhập học sinh:</p>
+            <p>- Thành công: {importLog.success}</p>
+            {importLog.errors.map((err, i) => <p key={i} className="text-red-500">- {err}</p>)}
+          </div>
+        )}
       </div>
     </div>
   );
