@@ -81,11 +81,13 @@ export const loginStudent = async (username: string, pass: string): Promise<User
   );
   const snapshot = await getDocs(q);
   if (snapshot.empty) return null;
-  return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as User;
+  const data = snapshot.docs[0].data();
+  return { id: snapshot.docs[0].id, ...data } as User;
 };
 
 // --- DATA FUNCTIONS ---
-export const approveUser = async (uid: string, role: Role) => {
+// SỬA: Thêm giá trị mặc định cho role để không lỗi build khi gọi từ AdminPanel
+export const approveUser = async (uid: string, role: Role = Role.TEACHER) => {
   await updateDoc(doc(db, 'users', uid), {
     isApproved: true,
     role: role
@@ -130,7 +132,8 @@ export const importStudentsFromExcel = async (data: any[]) => {
 
 export const ensureSignedIn = async () => {
   if (!auth.currentUser) {
-    return await signInAnonymously(auth);
+    const result = await signInAnonymously(auth);
+    return { user: result.user };
   }
   return { user: auth.currentUser };
 };
@@ -143,5 +146,6 @@ export const getStudentSubmission = async (studentId: string, roomId: string): P
   );
   const snapshot = await getDocs(q);
   if (snapshot.empty) return null;
-  return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Submission;
+  const data = snapshot.docs[0].data();
+  return { id: snapshot.docs[0].id, ...data } as Submission;
 };
