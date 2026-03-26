@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Role } from '../types';
+import { User, Role } from './types'; // SỬA: Thay ../ thành ./ vì file nằm cùng cấp
 import { 
   db, 
   collection, 
@@ -11,7 +11,7 @@ import {
   approveUser,
   doc,
   updateDoc
-} from '../services/firebaseService'; // SỬA: Thêm /services/ vào đường dẫn
+} from './services/firebaseService'; // SỬA: Thay ../ thành ./
 import * as XLSX from 'xlsx';
 
 interface PendingUser extends User {
@@ -43,27 +43,27 @@ const AdminPanel: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     // Lấy danh sách giáo viên đã duyệt
     const approvedQuery = query(
       collection(db, "users"), 
-      where("role", "in", [Role.TEACHER, Role.MEMBER]),
+      where("role", "in", [Role.TEACHER, Role.MEMBER, Role.ADMIN, Role.DEPUTY, Role.LEADER]),
       where("isApproved", "==", true)
     );
 
     // Lấy danh sách học sinh
-    const studentsQuery = query(
-      collection(db, "users"), 
+    const studentQuery = query(
+      collection(db, "users"),
       where("role", "==", Role.STUDENT)
     );
 
     const unsubPending = onSnapshot(pendingQuery, (snapshot) => {
-      setPendingUsers(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as PendingUser)));
+      setPendingUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PendingUser)));
       setLoading(false);
     });
 
     const unsubApproved = onSnapshot(approvedQuery, (snapshot) => {
-      setApprovedUsers(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as PendingUser)));
+      setApprovedUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PendingUser)));
     });
 
-    const unsubStudents = onSnapshot(studentsQuery, (snapshot) => {
-      setStudents(snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as PendingUser)));
+    const unsubStudents = onSnapshot(studentQuery, (snapshot) => {
+      setStudents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PendingUser)));
     });
 
     return () => {
@@ -89,9 +89,10 @@ const AdminPanel: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         
         const result = await importStudentsFromExcel(data);
         setImportLog(result);
-        alert(`Đã nhập xong: ${result.success} học sinh thành công!`);
+        alert(`Đã nhập xong ${result.success} học sinh!`);
       } catch (error) {
-        alert("Lỗi khi đọc file Excel");
+        console.error("Lỗi nhập file:", error);
+        alert("Có lỗi khi xử lý file Excel.");
       } finally {
         setIsImporting(false);
       }
@@ -99,92 +100,125 @@ const AdminPanel: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     reader.readAsBinaryString(file);
   };
 
-  const renderUserList = (users: PendingUser[]) => (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse">
-        <thead>
-          <tr className="bg-gray-50 border-b border-gray-100">
-            <th className="p-4 font-semibold text-gray-600">Tên/Tài khoản</th>
-            <th className="p-4 font-semibold text-gray-600">Lớp/Email</th>
-            <th className="p-4 font-semibold text-gray-600">Vai trò</th>
-            <th className="p-4 font-semibold text-gray-600 text-right">Thao tác</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.length === 0 ? (
-            <tr><td colSpan={4} className="p-10 text-center text-gray-400">Trống</td></tr>
-          ) : (
-            users.map(user => (
-              <tr key={user.uid} className="border-b border-gray-50 hover:bg-teal-50/30 transition-colors">
-                <td className="p-4">
-                  <p className="font-medium text-gray-800">{user.displayName || user.name}</p>
-                  <p className="text-xs text-gray-500">{user.username || user.email}</p>
+  const renderUserList = (users: PendingUser[]) => {
+    if (users.length === 0) {
+      return (
+        <div className="py-12 text-center">
+          <p className="text-gray-400">Không có dữ liệu hiển thị</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Thông tin</th>
+              <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Vai trò / Lớp</th>
+              <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-right">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {users.map((user) => (
+              <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    {user.photoURL ? (
+                      <img src={user.photoURL} className="w-10 h-10 rounded-full border border-gray-200" alt="" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-600 font-bold">
+                        {user.name.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <div className="font-medium text-gray-900">{user.name}</div>
+                      <div className="text-xs text-gray-500">{user.email || user.username}</div>
+                    </div>
+                  </div>
                 </td>
-                <td className="p-4">
-                  <span className="text-sm text-gray-600">{user.className || user.email}</span>
-                </td>
-                <td className="p-4">
-                  <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-xs uppercase font-bold">
-                    {user.role}
+                <td className="px-6 py-4">
+                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+                    user.role === Role.STUDENT ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'
+                  }`}>
+                    {user.role === Role.STUDENT ? (user.className || 'Học sinh') : user.role.toUpperCase()}
                   </span>
                 </td>
-                <td className="p-4 text-right space-x-2">
-                  {activeTab === 'pending' ? (
-                    <>
+                <td className="px-6 py-4 text-right">
+                  <div className="flex justify-end gap-2">
+                    {!user.isApproved && user.role !== Role.STUDENT && (
                       <button 
-                        onClick={() => approveUser(user.uid)}
-                        className="px-3 py-1 bg-teal-500 text-white rounded-lg text-sm hover:bg-teal-600"
-                      >Duyệt</button>
-                      <button 
-                        onClick={() => rejectUser(user.uid)}
-                        className="px-3 py-1 bg-red-100 text-red-600 rounded-lg text-sm hover:bg-red-200"
-                      >Từ chối</button>
-                    </>
-                  ) : (
+                        onClick={() => approveUser(user.id, Role.TEACHER)}
+                        className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                        title="Duyệt"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </button>
+                    )}
                     <button 
                       onClick={() => {
-                        const newClass = prompt("Nhập lớp mới:", user.className);
-                        if (newClass !== null) updateDoc(doc(db, "users", user.uid), { className: newClass });
+                        if(confirm('Xác nhận xóa người dùng này?')) rejectUser(user.id);
                       }}
-                      className="text-teal-600 hover:underline text-sm"
-                    >Sửa lớp</button>
-                  )}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Xóa"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
                 </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  const tabs = [
+    { id: 'pending', label: 'Chờ duyệt', count: pendingUsers.length },
+    { id: 'approved', label: 'Giáo viên', count: approvedUsers.length },
+    { id: 'students', label: 'Học sinh', count: students.length },
+  ];
 
   return (
-    <div className="min-h-screen bg-white p-4 md:p-8">
+    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <button onClick={onBack} className="text-teal-600 mb-2 flex items-center gap-1 hover:underline">
-              ← Quay lại
+            <button 
+              onClick={onBack}
+              className="flex items-center text-gray-500 hover:text-teal-600 transition-colors mb-2 group"
+            >
+              <svg className="w-5 h-5 mr-1 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+              </svg>
+              Quay lại
             </button>
             <h1 className="text-3xl font-bold text-gray-900">Quản trị hệ thống</h1>
+            <p className="text-gray-500">Quản lý người dùng và danh sách học sinh</p>
           </div>
 
-          {activeTab === 'students' && (
-            <div className="flex items-center gap-2">
-              <label className={`cursor-pointer bg-teal-600 text-white px-4 py-2 rounded-xl font-medium shadow-lg shadow-teal-200 hover:bg-teal-700 transition-all ${isImporting ? 'opacity-50 pointer-events-none' : ''}`}>
-                {isImporting ? 'Đang xử lý...' : 'Nhập file Excel'}
-                <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
-              </label>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <label className={`
+              cursor-pointer flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl
+              hover:bg-teal-700 transition-all shadow-sm shadow-teal-200
+              ${isImporting ? 'opacity-50 pointer-events-none' : ''}
+            `}>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+              </svg>
+              <span>{isImporting ? 'Đang nhập...' : 'Nhập học sinh Excel'}</span>
+              <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
+            </label>
+          </div>
         </div>
 
-        <div className="flex border-b border-gray-100 mb-6 overflow-x-auto">
-          {[
-            { id: 'pending', label: 'Chờ duyệt', count: pendingUsers.length },
-            { id: 'approved', label: 'Giáo viên', count: approvedUsers.length },
-            { id: 'students', label: 'Học sinh', count: students.length }
-          ].map(tab => (
+        <div className="flex border-b border-gray-200 mb-6 overflow-x-auto no-scrollbar">
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
@@ -214,7 +248,9 @@ const AdminPanel: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           <div className="mt-6 p-4 bg-gray-50 rounded-xl text-xs border border-gray-200 max-h-40 overflow-auto">
             <p className="font-bold text-teal-700">Kết quả nhập học sinh:</p>
             <p>- Thành công: {importLog.success}</p>
-            {importLog.errors.map((err, i) => <p key={i} className="text-red-500">- {err}</p>)}
+            {importLog.errors.map((err, idx) => (
+              <p key={idx} className="text-red-500">- {err}</p>
+            ))}
           </div>
         )}
       </div>
