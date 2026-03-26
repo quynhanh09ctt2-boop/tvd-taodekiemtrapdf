@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-// Đảm bảo các component này tồn tại đúng tên file (Case-sensitive)
+import { onAuthStateChanged } from 'firebase/auth';
+
+// Import Components - Đảm bảo các file này tồn tại trong thư mục src/components/
 import StudentPortal from './components/StudentPortal';
 import ExamRoom from './components/ExamRoom';
 import PDFExamRoom from './components/PDFExamRoom';
@@ -32,19 +34,23 @@ function App() {
   const [currentSubmission, setCurrentSubmission] = useState<Submission | null>(null);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setIsAuthLoading(true);
       if (user) {
-        const userData = await getCurrentUser(user.uid);
-        if (userData) {
-          setCurrentUser(userData);
-          if (!userData.isApproved && userData.role !== Role.STUDENT) {
-            setCurrentView('pending-approval');
-          } else if (userData.role === Role.ADMIN) {
-            setCurrentView('admin-users');
-          } else {
-            setCurrentView('teacher-dashboard');
+        try {
+          const userData = await getCurrentUser(user.uid);
+          if (userData) {
+            setCurrentUser(userData);
+            if (userData.role === Role.ADMIN || userData.role === Role.DEPUTY) {
+              setCurrentView('teacher-dashboard');
+            } else if (!userData.isApproved) {
+              setCurrentView('pending-approval');
+            } else {
+              setCurrentView('teacher-dashboard');
+            }
           }
+        } catch (error) {
+          console.error("Auth error:", error);
         }
       } else {
         setCurrentUser(null);
@@ -54,108 +60,122 @@ function App() {
       }
       setIsAuthLoading(false);
     });
+
     return () => unsubscribe();
   }, []);
 
   const handleGoogleLogin = async () => {
     try {
-      const user = await signInWithGoogle();
-      if (!user.isApproved) {
-        setCurrentView('pending-approval');
-      } else if (user.role === Role.ADMIN) {
-        setCurrentView('admin-users');
-      } else {
-        setCurrentView('teacher-dashboard');
-      }
-    } catch (err) {
-      console.error("Login failed", err);
+      await signInWithGoogle();
+    } catch (error) {
+      alert("Đăng nhập thất bại. Vui lòng thử lại.");
     }
   };
 
   const handleStudentLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
-    const user = await loginStudent(loginData.username, loginData.password);
-    if (user) {
-      setCurrentUser(user);
-      setCurrentStudent({
-        id: user.id,
-        name: user.name,
-        className: user.className,
-        studentId: user.username
-      });
-      setCurrentView('student-portal');
-    } else {
-      setLoginError('Sai tài khoản hoặc mật khẩu!');
+    try {
+      const student = await loginStudent(loginData.username, loginData.password);
+      if (student) {
+        setCurrentUser(student);
+        setCurrentView('student-portal');
+      } else {
+        setLoginError('Sai tên đăng nhập hoặc mật khẩu');
+      }
+    } catch (error) {
+      setLoginError('Có lỗi xảy ra, vui lòng thử lại');
     }
   };
 
   const handleLogout = async () => {
     await signOutUser();
     setCurrentUser(null);
-    setCurrentStudent(null);
     setCurrentView('landing');
   };
 
   if (isAuthLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-teal-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-teal-500 border-t-transparent"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-teal-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-teal-600 font-medium">Đang kiểm tra quyền truy cập...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {currentView === 'landing' && (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4">
-          <h1 className="text-4xl font-bold text-teal-700 mb-8">Hệ Thống Thi Online</h1>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-teal-500 to-teal-700 text-white text-center">
+          <h1 className="text-5xl font-bold mb-4">TVD Exam Maker</h1>
+          <p className="text-xl mb-8 opacity-90">Hệ thống tạo đề và thi trực tuyến dành cho giáo viên & học sinh</p>
+          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
             <button 
               onClick={() => setCurrentView('student-login')}
-              className="p-8 bg-white rounded-2xl shadow-xl hover:shadow-2xl transition-all border-2 border-transparent hover:border-teal-500 group"
+              className="flex-1 bg-white text-teal-600 font-bold py-4 px-8 rounded-2xl shadow-xl hover:bg-teal-50 transition-all transform hover:scale-105"
             >
-              <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">🎓</div>
-              <h2 className="text-xl font-bold text-gray-800">Dành cho Học sinh</h2>
-              <p className="text-gray-500 mt-2">Đăng nhập bằng mã số để làm bài thi</p>
+              Học sinh đăng nhập
             </button>
             <button 
               onClick={handleGoogleLogin}
-              className="p-8 bg-white rounded-2xl shadow-xl hover:shadow-2xl transition-all border-2 border-transparent hover:border-teal-500 group"
+              className="flex-1 bg-teal-800/30 backdrop-blur-sm border-2 border-white/30 text-white font-bold py-4 px-8 rounded-2xl shadow-xl hover:bg-teal-800/40 transition-all transform hover:scale-105 flex items-center justify-center gap-2"
             >
-              <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">👨‍🏫</div>
-              <h2 className="text-xl font-bold text-gray-800">Dành cho Giáo viên</h2>
-              <p className="text-gray-500 mt-2">Đăng nhập Google để quản lý đề thi</p>
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
+                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+              </svg>
+              Giáo viên
             </button>
           </div>
         </div>
       )}
 
       {currentView === 'student-login' && (
-        <div className="min-h-screen flex items-center justify-center p-4">
-          <form onSubmit={handleStudentLogin} className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-            <h2 className="text-2xl font-bold text-center mb-6">Đăng nhập Học sinh</h2>
-            <input 
-              type="text" placeholder="Tên đăng nhập / Mã HS"
-              className="w-full p-3 border rounded-lg mb-4"
-              value={loginData.username}
-              onChange={e => setLoginData({...loginData, username: e.target.value})}
-            />
-            <input 
-              type="password" placeholder="Mật khẩu"
-              className="w-full p-3 border rounded-lg mb-4"
-              value={loginData.password}
-              onChange={e => setLoginData({...loginData, password: e.target.value})}
-            />
-            {loginError && <p className="text-red-500 text-sm mb-4">{loginError}</p>}
-            <button type="submit" className="w-full bg-teal-600 text-white p-3 rounded-lg font-bold hover:bg-teal-700">Đăng nhập</button>
-            <button type="button" onClick={() => setCurrentView('landing')} className="w-full mt-4 text-gray-500 text-sm">Quay lại</button>
-          </form>
+        <div className="min-h-screen flex items-center justify-center p-4 bg-teal-50">
+          <div className="w-full max-w-md bg-white p-8 rounded-3xl shadow-2xl border border-teal-100">
+            <button onClick={() => setCurrentView('landing')} className="text-teal-600 mb-6 flex items-center gap-2 hover:underline">
+              ← Quay lại
+            </button>
+            <h2 className="text-3xl font-bold text-gray-800 mb-2 text-center">Học sinh</h2>
+            <p className="text-gray-500 text-center mb-8">Vui lòng đăng nhập để bắt đầu bài thi</p>
+            <form onSubmit={handleStudentLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tên đăng nhập</label>
+                <input 
+                  type="text" 
+                  className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition-all"
+                  placeholder="Nhập mã học sinh..."
+                  value={loginData.username}
+                  onChange={(e) => setLoginData({...loginData, username: e.target.value})}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
+                <input 
+                  type="password" 
+                  className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none transition-all"
+                  placeholder="••••••••"
+                  value={loginData.password}
+                  onChange={(e) => setLoginData({...loginData, password: e.target.value})}
+                  required
+                />
+              </div>
+              {loginError && <p className="text-red-500 text-sm text-center">{loginError}</p>}
+              <button className="w-full bg-teal-600 text-white font-bold py-4 rounded-xl hover:bg-teal-700 transition-all shadow-lg shadow-teal-200 mt-4">
+                Vào phòng thi
+              </button>
+            </form>
+          </div>
         </div>
       )}
 
-      {currentView === 'student-portal' && currentStudent && (
-        <StudentPortal student={currentStudent} onLogout={handleLogout} onJoinRoom={(room, std) => {
+      {currentView === 'student-portal' && currentUser && (
+        <StudentPortal user={currentUser} onLogout={handleLogout} onJoinRoom={(room, std) => {
           setCurrentRoom(room); 
           setCurrentStudent(std);
           setCurrentView(room.settings.pdfUrl ? 'pdf-exam-room' : 'exam-room'); 
@@ -183,8 +203,7 @@ function App() {
       {currentView === 'result' && currentSubmission && currentRoom && (
         <ResultView 
           submission={currentSubmission} 
-          room={currentRoom}
-          onExit={() => setCurrentView('student-portal')} 
+          room={currentRoom}\n          onExit={() => setCurrentView('student-portal')} 
         />
       )}
 
