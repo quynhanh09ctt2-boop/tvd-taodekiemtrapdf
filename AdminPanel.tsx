@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Role } from './types';
+import { User, Role } from '../types';
 import { 
   db, 
   collection, 
@@ -11,7 +11,7 @@ import {
   approveUser,
   doc,
   updateDoc
-} from './services/firebaseService'; // SỬA: Thêm /services/ vào đường dẫn
+} from '../services/firebaseService'; // SỬA: Thêm /services/ vào đường dẫn
 import * as XLSX from 'xlsx';
 
 interface PendingUser extends User {
