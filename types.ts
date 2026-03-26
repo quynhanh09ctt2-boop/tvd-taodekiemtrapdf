@@ -51,25 +51,35 @@ export interface ExamPointsConfig {
   autoBalance?: boolean;
 }
 
-// Interface dùng cho kết quả parse từ Word và Export HTML
 export interface ExamData {
   title: string;
   description?: string;
   questions: Question[];
   totalQuestions: number;
-  answers?: { [key: number]: any }; // Đáp án tham chiếu nếu có
-  pointsConfig?: ExamPointsConfig;
+  answers?: { [key: number]: any };
 }
 
 export interface Exam {
   id: string;
   title: string;
   description?: string;
+  questions: Question[];
+  createdAt: any;
   teacherId: string;
-  questions: Question[]; 
   pointsConfig?: ExamPointsConfig;
-  createdAt?: any;
-  updatedAt?: any;
+}
+
+export interface User {
+  id: string;
+  uid?: string;
+  name: string;
+  email?: string;
+  role: Role;
+  isApproved: boolean;
+  photoURL?: string;
+  className?: string;
+  username?: string;
+  password?: string;
 }
 
 export interface Room {
@@ -90,7 +100,7 @@ export interface Room {
     showResults: boolean;
     allowReview: boolean;
     maxAttempts: number;
-    pdfUrl?: string; // Hỗ trợ chế độ thi PDF
+    pdfUrl?: string;
     [key: string]: any;
   };
 }
@@ -103,10 +113,16 @@ export interface StudentInfo {
   className?: string;
 }
 
+export interface ScoreCategory {
+  correct: number;
+  total: number;
+  points: number;
+}
+
 export interface ScoreBreakdown {
-  multipleChoice: { correct: number; total: number; points: number };
-  trueFalse: { correct: number; total: number; points: number };
-  shortAnswer: { correct: number; total: number; points: number };
+  multipleChoice: ScoreCategory;
+  trueFalse: ScoreCategory;
+  shortAnswer: ScoreCategory;
 }
 
 export interface Submission {
@@ -115,8 +131,8 @@ export interface Submission {
   examId: string;
   student: StudentInfo;
   answers: { [key: number]: any };
-  score: number;        // Điểm thô
-  totalScore: number;   // Điểm sau khi quy đổi thang 10
+  score: number;
+  totalScore: number;
   percentage: number;
   correctCount: number;
   wrongCount: number;
@@ -124,16 +140,5 @@ export interface Submission {
   duration: number;
   submittedAt: any;
   tabSwitchCount?: number;
-  scoreBreakdown: ScoreBreakdown; // Bắt buộc phải có cho Excel Export
-}
-
-export interface User {
-  uid: string;
-  email?: string;
-  displayName?: string;
-  photoURL?: string;
-  role: Role;
-  isApproved: boolean;
-  className?: string;
-  username?: string; // Dùng cho tài khoản học sinh
+  scoreBreakdown?: ScoreBreakdown; // Chuyển thành optional để tránh crash khi chưa có data
 }
