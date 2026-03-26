@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-// Import các Component - Giả định tất cả nằm trong thư mục components/
+// Đảm bảo các component này tồn tại đúng tên file (Case-sensitive)
 import StudentPortal from './components/StudentPortal';
 import ExamRoom from './components/ExamRoom';
 import PDFExamRoom from './components/PDFExamRoom';
@@ -8,7 +8,6 @@ import TeacherDashboard from './components/TeacherDashboard';
 import PendingApproval from './components/PendingApproval';
 import AdminPanel from './AdminPanel'; 
 
-// Import Types và Services - ĐÃ SỬA ĐƯỜNG DẪN CHUẨN
 import { User, Role, Room, StudentInfo, Submission } from './types';
 import { 
   auth, 
@@ -16,7 +15,7 @@ import {
   signOutUser, 
   getCurrentUser, 
   loginStudent 
-} from './services/firebaseService'; // Luôn dùng /services/
+} from './services/firebaseService';
 
 type AppView = 'landing' | 'student-login' | 'student-portal' | 'exam-room' | 'pdf-exam-room' | 'result' | 'teacher-dashboard' | 'pending-approval' | 'admin-users';
 
@@ -33,50 +32,61 @@ function App() {
   const [currentSubmission, setCurrentSubmission] = useState<Submission | null>(null);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const user = await getCurrentUser();
-        if (user) {
-          setCurrentUser(user);
-          if (user.role === Role.ADMIN) setCurrentView('admin-users');
-          else if (!user.isApproved) setCurrentView('pending-approval');
-          else setCurrentView('teacher-dashboard');
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      setIsAuthLoading(true);
+      if (user) {
+        const userData = await getCurrentUser(user.uid);
+        if (userData) {
+          setCurrentUser(userData);
+          if (!userData.isApproved && userData.role !== Role.STUDENT) {
+            setCurrentView('pending-approval');
+          } else if (userData.role === Role.ADMIN) {
+            setCurrentView('admin-users');
+          } else {
+            setCurrentView('teacher-dashboard');
+          }
         }
-      } catch (error) {
-        console.error("Auth error:", error);
-      } finally {
-        setIsAuthLoading(false);
+      } else {
+        setCurrentUser(null);
+        if (currentView !== 'student-login' && currentView !== 'student-portal') {
+          setCurrentView('landing');
+        }
       }
-    };
-    checkAuth();
+      setIsAuthLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   const handleGoogleLogin = async () => {
     try {
       const user = await signInWithGoogle();
-      setCurrentUser(user);
-      if (user.role === Role.ADMIN) setCurrentView('admin-users');
-      else if (!user.isApproved) setCurrentView('pending-approval');
-      else setCurrentView('teacher-dashboard');
-    } catch (error: any) {
-      alert(error.message || "Lỗi đăng nhập");
+      if (!user.isApproved) {
+        setCurrentView('pending-approval');
+      } else if (user.role === Role.ADMIN) {
+        setCurrentView('admin-users');
+      } else {
+        setCurrentView('teacher-dashboard');
+      }
+    } catch (err) {
+      console.error("Login failed", err);
     }
   };
 
   const handleStudentLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
-    try {
-      const student = await loginStudent(loginData.username, loginData.password);
+    const user = await loginStudent(loginData.username, loginData.password);
+    if (user) {
+      setCurrentUser(user);
       setCurrentStudent({
-        id: student.uid,
-        name: student.displayName || student.username || 'Học sinh',
-        studentId: student.username,
-        className: student.className
+        id: user.id,
+        name: user.name,
+        className: user.className,
+        studentId: user.username
       });
       setCurrentView('student-portal');
-    } catch (error: any) {
-      setLoginError(error.message);
+    } else {
+      setLoginError('Sai tài khoản hoặc mật khẩu!');
     }
   };
 
@@ -96,63 +106,56 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans antialiased text-gray-900">
+    <div className="min-h-screen bg-gray-50">
       {currentView === 'landing' && (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-teal-500 to-teal-700">
-          <div className="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md text-center">
-            <h1 className="text-4xl font-black text-teal-600 mb-2">TVD EXAM</h1>
-            <p className="text-gray-500 mb-8 font-medium">Hệ thống khảo sát & ôn tập trực tuyến</p>
-            
-            <div className="space-y-4">
-              <button 
-                onClick={() => setCurrentView('student-login')}
-                className="w-full py-4 bg-teal-600 text-white rounded-2xl font-bold text-lg shadow-lg shadow-teal-200 hover:bg-teal-700 transition-all active:scale-95"
-              >
-                HỌC SINH ĐĂNG NHẬP
-              </button>
-              <div className="relative py-2">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
-                <span className="relative px-4 bg-white text-gray-400 text-xs">DÀNH CHO GIÁO VIÊN</span>
-              </div>
-              <button 
-                onClick={handleGoogleLogin}
-                className="w-full py-4 border-2 border-gray-100 text-gray-700 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-gray-50 transition-all active:scale-95"
-              >
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/0/google.svg" className="w-5 h-5" alt="G" />
-                Đăng nhập với Google
-              </button>
-            </div>
+        <div className="min-h-screen flex flex-col items-center justify-center p-4">
+          <h1 className="text-4xl font-bold text-teal-700 mb-8">Hệ Thống Thi Online</h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
+            <button 
+              onClick={() => setCurrentView('student-login')}
+              className="p-8 bg-white rounded-2xl shadow-xl hover:shadow-2xl transition-all border-2 border-transparent hover:border-teal-500 group"
+            >
+              <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">🎓</div>
+              <h2 className="text-xl font-bold text-gray-800">Dành cho Học sinh</h2>
+              <p className="text-gray-500 mt-2">Đăng nhập bằng mã số để làm bài thi</p>
+            </button>
+            <button 
+              onClick={handleGoogleLogin}
+              className="p-8 bg-white rounded-2xl shadow-xl hover:shadow-2xl transition-all border-2 border-transparent hover:border-teal-500 group"
+            >
+              <div className="text-4xl mb-4 group-hover:scale-110 transition-transform">👨‍🏫</div>
+              <h2 className="text-xl font-bold text-gray-800">Dành cho Giáo viên</h2>
+              <p className="text-gray-500 mt-2">Đăng nhập Google để quản lý đề thi</p>
+            </button>
           </div>
         </div>
       )}
 
       {currentView === 'student-login' && (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-teal-50">
-          <form onSubmit={handleStudentLogin} className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md">
-            <button type="button" onClick={() => setCurrentView('landing')} className="text-teal-600 mb-4 font-medium hover:underline">← Quay lại</button>
-            <h2 className="text-2xl font-bold mb-6">Học sinh đăng nhập</h2>
-            {loginError && <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm mb-4">{loginError}</div>}
-            <div className="space-y-4 mb-6">
-              <input 
-                type="text" placeholder="Tên đăng nhập (Mã HS)" 
-                className="w-full p-4 bg-gray-50 rounded-xl border border-transparent focus:border-teal-500 outline-none transition-all"
-                value={loginData.username} onChange={e => setLoginData({...loginData, username: e.target.value})}
-              />
-              <input 
-                type="password" placeholder="Mật khẩu" 
-                className="w-full p-4 bg-gray-50 rounded-xl border border-transparent focus:border-teal-500 outline-none transition-all"
-                value={loginData.password} onChange={e => setLoginData({...loginData, password: e.target.value})}
-              />
-            </div>
-            <button className="w-full py-4 bg-teal-600 text-white rounded-2xl font-bold shadow-lg shadow-teal-100 hover:bg-teal-700 transition-all">
-              VÀO PHÒNG THI
-            </button>
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <form onSubmit={handleStudentLogin} className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+            <h2 className="text-2xl font-bold text-center mb-6">Đăng nhập Học sinh</h2>
+            <input 
+              type="text" placeholder="Tên đăng nhập / Mã HS"
+              className="w-full p-3 border rounded-lg mb-4"
+              value={loginData.username}
+              onChange={e => setLoginData({...loginData, username: e.target.value})}
+            />
+            <input 
+              type="password" placeholder="Mật khẩu"
+              className="w-full p-3 border rounded-lg mb-4"
+              value={loginData.password}
+              onChange={e => setLoginData({...loginData, password: e.target.value})}
+            />
+            {loginError && <p className="text-red-500 text-sm mb-4">{loginError}</p>}
+            <button type="submit" className="w-full bg-teal-600 text-white p-3 rounded-lg font-bold hover:bg-teal-700">Đăng nhập</button>
+            <button type="button" onClick={() => setCurrentView('landing')} className="w-full mt-4 text-gray-500 text-sm">Quay lại</button>
           </form>
         </div>
       )}
 
       {currentView === 'student-portal' && currentStudent && (
-        <StudentPortal student={currentStudent} onLogout={handleLogout} onStartExam={(room, std) => { 
+        <StudentPortal student={currentStudent} onLogout={handleLogout} onJoinRoom={(room, std) => {
           setCurrentRoom(room); 
           setCurrentStudent(std);
           setCurrentView(room.settings.pdfUrl ? 'pdf-exam-room' : 'exam-room'); 
