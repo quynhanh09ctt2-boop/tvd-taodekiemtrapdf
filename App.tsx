@@ -9,14 +9,14 @@ import PendingApproval from './components/PendingApproval';
 import AdminPanel from './AdminPanel'; 
 
 // Import Types và Services - ĐÃ SỬA ĐƯỜNG DẪN CHUẨN
-import { User, Role, Room, StudentInfo, Submission } from './types';
+import { User, Role, Room, StudentInfo, Submission } from '../types';
 import { 
   auth, 
   signInWithGoogle, 
   signOutUser, 
   getCurrentUser, 
   loginStudent 
-} from './services/firebaseService'; // Luôn dùng /services/
+} from '../services/firebaseService'; // Luôn dùng /services/
 
 type AppView = 'landing' | 'student-login' | 'student-portal' | 'exam-room' | 'pdf-exam-room' | 'result' | 'teacher-dashboard' | 'pending-approval' | 'admin-users';
 
