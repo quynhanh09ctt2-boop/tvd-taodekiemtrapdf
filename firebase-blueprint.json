@@ -1,0 +1,127 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the application, either a teacher or a student.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The user's full name"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["teacher", "student"],
+          "description": "The user's role"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the user was created"
+        }
+      },
+      "required": ["name", "email", "role", "createdAt"]
+    },
+    "Test": {
+      "title": "Test",
+      "description": "A test created by a teacher.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The title of the test"
+        },
+        "description": {
+          "type": "string",
+          "description": "The description of the test"
+        },
+        "teacherId": {
+          "type": "string",
+          "description": "The ID of the teacher who created the test"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "text": { "type": "string" },
+              "options": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "correctOptionIndex": { "type": "number" }
+            },
+            "required": ["id", "text", "options", "correctOptionIndex"]
+          },
+          "description": "The questions in the test"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the test was created"
+        }
+      },
+      "required": ["title", "description", "teacherId", "questions", "createdAt"]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "A student's submission for a test.",
+      "type": "object",
+      "properties": {
+        "testId": {
+          "type": "string",
+          "description": "The ID of the test"
+        },
+        "studentId": {
+          "type": "string",
+          "description": "The ID of the student"
+        },
+        "studentName": {
+          "type": "string",
+          "description": "The name of the student"
+        },
+        "answers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Map of question ID to selected option index"
+        },
+        "score": {
+          "type": "number",
+          "description": "The student's score"
+        },
+        "totalQuestions": {
+          "type": "number",
+          "description": "Total number of questions in the test"
+        },
+        "submittedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the submission was made"
+        }
+      },
+      "required": ["testId", "studentId", "studentName", "answers", "score", "totalQuestions", "submittedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Users collection"
+    },
+    "/tests/{testId}": {
+      "schema": { "$ref": "#/entities/Test" },
+      "description": "Tests collection"
+    },
+    "/submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/Submission" },
+      "description": "Submissions collection"
+    }
+  }
+}

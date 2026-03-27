@@ -1,0 +1,142 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isTeacher() {
+      return isAuthenticated() && getUserData().role == 'teacher';
+    }
+    
+    function isStudent() {
+      return isAuthenticated() && getUserData().role == 'student';
+    }
+    
+    function hasOnlyAllowedFields(allowedFields) {
+      return request.resource.data.keys().hasOnly(allowedFields);
+    }
+    
+    function hasRequiredFields(requiredFields) {
+      return request.resource.data.keys().hasAll(requiredFields);
+    }
+    
+    function isValidString(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+             request.resource.data[field].size() >= minLen &&
+             request.resource.data[field].size() <= maxLen;
+    }
+    
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    
+    function isValidUser() {
+      return hasOnlyAllowedFields(['name', 'email', 'role', 'createdAt']) &&
+             hasRequiredFields(['name', 'email', 'role', 'createdAt']) &&
+             isValidString('name', 1, 100) &&
+             isValidString('email', 5, 100) &&
+             request.resource.data.role in ['teacher', 'student'] &&
+             request.resource.data.createdAt is timestamp;
+    }
+    
+    function isValidQuestion(q) {
+      return q.keys().hasOnly(['id', 'text', 'options', 'correctOptionIndex']) &&
+             q.keys().hasAll(['id', 'text', 'options', 'correctOptionIndex']) &&
+             q.id is string && q.id.size() > 0 && q.id.size() <= 50 &&
+             q.text is string && q.text.size() > 0 && q.text.size() <= 1000 &&
+             q.options is list && q.options.size() >= 2 && q.options.size() <= 10 &&
+             q.correctOptionIndex is number && q.correctOptionIndex >= 0 && q.correctOptionIndex < q.options.size();
+    }
+    
+    function areValidQuestions(questions) {
+      return questions is list && questions.size() > 0 && questions.size() <= 100;
+      // Note: Deep array inspection is limited in rules, but we check size.
+      // We can't easily iterate over the list in rules to validate each item perfectly without a complex function.
+      // But we can check the first few if needed, or just rely on the client for deep structure, 
+      // but to be secure we should ensure it's a list of reasonable size.
+    }
+    
+    function isValidTest() {
+      return hasOnlyAllowedFields(['title', 'description', 'teacherId', 'questions', 'createdAt']) &&
+             hasRequiredFields(['title', 'description', 'teacherId', 'questions', 'createdAt']) &&
+             isValidString('title', 1, 200) &&
+             isValidString('description', 0, 2000) &&
+             request.resource.data.teacherId == request.auth.uid &&
+             areValidQuestions(request.resource.data.questions) &&
+             request.resource.data.createdAt is timestamp;
+    }
+    
+    function isValidSubmission() {
+      return hasOnlyAllowedFields(['testId', 'studentId', 'studentName', 'answers', 'score', 'totalQuestions', 'submittedAt']) &&
+             hasRequiredFields(['testId', 'studentId', 'studentName', 'answers', 'score', 'totalQuestions', 'submittedAt']) &&
+             request.resource.data.testId is string && request.resource.data.testId.size() > 0 && request.resource.data.testId.size() <= 100 &&
+             request.resource.data.studentId == request.auth.uid &&
+             isValidString('studentName', 1, 100) &&
+             request.resource.data.answers is map &&
+             request.resource.data.score is number && request.resource.data.score >= 0 &&
+             request.resource.data.totalQuestions is number && request.resource.data.totalQuestions > 0 &&
+             request.resource.data.submittedAt is timestamp;
+    }
+    
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    
+    match /users/{userId} {
+      // Users can read their own profile. Teachers can read all profiles to see student names.
+      allow read: if isAuthenticated() && (isOwner(userId) || isTeacher());
+      
+      // Users can create their own profile. Role must be 'teacher' or 'student'.
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser();
+      
+      // Users can update their own profile, but cannot change their role.
+      allow update: if isAuthenticated() && isOwner(userId) && isValidUser() &&
+                    request.resource.data.role == resource.data.role &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+                    
+      allow delete: if false;
+    }
+    
+    match /tests/{testId} {
+      // Anyone authenticated can read tests (students need to take them, teachers need to see them).
+      allow read: if isAuthenticated();
+      
+      // Only teachers can create tests.
+      allow create: if isTeacher() && isValidTest();
+      
+      // Only the teacher who created the test can update it.
+      allow update: if isTeacher() && resource.data.teacherId == request.auth.uid && isValidTest() &&
+                    request.resource.data.teacherId == resource.data.teacherId &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+                    
+      // Only the teacher who created the test can delete it.
+      allow delete: if isTeacher() && resource.data.teacherId == request.auth.uid;
+    }
+    
+    match /submissions/{submissionId} {
+      // Students can read their own submissions. Teachers can read all submissions.
+      allow read: if isAuthenticated() && (resource.data.studentId == request.auth.uid || isTeacher());
+      
+      // Students can create submissions.
+      allow create: if isStudent() && isValidSubmission();
+      
+      // Submissions cannot be updated or deleted once submitted.
+      allow update, delete: if false;
+    }
+  }
+}
