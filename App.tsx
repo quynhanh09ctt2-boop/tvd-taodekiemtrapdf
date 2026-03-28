@@ -132,7 +132,7 @@ function App() {
         setCurrentView('landing');
         return null;
       }
-      // ✅ Nếu đề thi có PDF (Drive URL hoặc base64 cũ) → split-view PDFExamRoom
+      // ✅ Nếu đề kiểm tra có PDF (Drive URL hoặc base64 cũ) → split-view PDFExamRoom
       if (
         currentExam?.pdfDriveUrl ||
         currentExam?.pdfDriveFileId ||
