@@ -1,5 +1,5 @@
 // src/components/PDFExamCreator.tsx
-// Wizard tạo đề kiểm tra từ file PDF
+// Wizard tạo đề thi từ file PDF
 // ✅ CẢI TIẾN: Upload PDF lên Google Drive qua GAS (không cần OAuth popup)
 
 import React, { useState, useRef, useCallback } from 'react';
@@ -65,9 +65,9 @@ function buildExamData(config: PDFExamConfig, mcAns: MCAnswers, tfAns: TFAnswers
   });
 
   const sections: ExamSection[] = [];
-  if (config.mcCount > 0) sections.push({ name: 'PHẦN I. TRẮC NGHIỆM NHIỀU LỰA CHỌN', description: `Học sinh trả lời từ câu 1 đến câu ${config.mcCount}.`, points: '3', questions: questions.filter(q => q.part === 'PHẦN I'),  sectionType: 'multiple_choice' });
-  if (config.tfCount > 0) sections.push({ name: 'PHẦN II. TRẮC NGHIỆM ĐÚNG SAI',       description: `Học sinh trả lời từ câu 1 đến câu ${config.tfCount}.`, points: '4', questions: questions.filter(q => q.part === 'PHẦN II'), sectionType: 'true_false' });
-  if (config.saCount > 0) sections.push({ name: 'PHẦN III. TRẢ LỜI NGẮN',              description: `Học sinh trả lời từ câu 1 đến câu ${config.saCount}.`, points: '3', questions: questions.filter(q => q.part === 'PHẦN III'), sectionType: 'short_answer' });
+  if (config.mcCount > 0) sections.push({ name: 'PHẦN I. TRẮC NGHIỆM NHIỀU LỰA CHỌN', description: `Thí sinh trả lời từ câu 1 đến câu ${config.mcCount}.`, points: '3', questions: questions.filter(q => q.part === 'PHẦN I'),  sectionType: 'multiple_choice' });
+  if (config.tfCount > 0) sections.push({ name: 'PHẦN II. TRẮC NGHIỆM ĐÚNG SAI',       description: `Thí sinh trả lời từ câu 1 đến câu ${config.tfCount}.`, points: '4', questions: questions.filter(q => q.part === 'PHẦN II'), sectionType: 'true_false' });
+  if (config.saCount > 0) sections.push({ name: 'PHẦN III. TRẢ LỜI NGẮN',              description: `Thí sinh trả lời từ câu 1 đến câu ${config.saCount}.`, points: '3', questions: questions.filter(q => q.part === 'PHẦN III'), sectionType: 'short_answer' });
   return { questions, sections, answers };
 }
 
@@ -295,7 +295,7 @@ const PDFExamCreator: React.FC<PDFExamCreatorProps> = ({ teacherId, teacherName,
   if (step === 1) return (
     <div className="max-w-3xl mx-auto p-6 bg-white rounded-2xl shadow-lg">
       <StepIndicator step={step} />
-      <h2 className="text-xl font-bold text-gray-800 mb-1">📄 Tải đề kiểm tra PDF</h2>
+      <h2 className="text-xl font-bold text-gray-800 mb-1">📄 Tải đề thi PDF</h2>
       <p className="text-sm text-gray-500 mb-5">
         Upload file PDF — sẽ được lưu lên <strong>Google Drive</strong> (không tốn Firestore storage)
       </p>
@@ -318,7 +318,7 @@ const PDFExamCreator: React.FC<PDFExamCreatorProps> = ({ teacherId, teacherName,
       {pdfBase64 && (
         <div className="mt-5 space-y-3">
           <div>
-            <label className="text-sm font-medium text-gray-700">Tiêu đề đề kiểm tra *</label>
+            <label className="text-sm font-medium text-gray-700">Tiêu đề đề thi *</label>
             <input type="text" placeholder="VD: Kiểm tra Toán 10 HK1 2024-2025"
               value={config.title} onChange={e => setConfig(c => ({ ...c, title: e.target.value }))}
               className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
@@ -494,7 +494,7 @@ const PDFExamCreator: React.FC<PDFExamCreatorProps> = ({ teacherId, teacherName,
           <button onClick={handleSave} disabled={isSaving || !pointsConfig || !driveResult}
             className="px-8 py-2 bg-teal-600 text-white rounded-lg font-semibold disabled:opacity-40 hover:bg-teal-700 flex items-center gap-2">
             {isSaving && <span className="animate-spin">⏳</span>}
-            {isSaving ? 'Đang lưu...' : !driveResult ? '☁️ Upload Drive trước' : '💾 Lưu đề kiểm tra'}
+            {isSaving ? 'Đang lưu...' : !driveResult ? '☁️ Upload Drive trước' : '💾 Lưu đề thi'}
           </button>
         </div>
       </div>
