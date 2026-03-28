@@ -127,7 +127,7 @@ const StudentHistory: React.FC<StudentHistoryProps> = ({ student }) => {
     setIsLoadingDetail(true);
     try {
       const room = await getRoom(sub.roomId);
-      if (!room) { alert('❌ Không tìm thấy thông tin phòng thi!'); return; }
+      if (!room) { alert('❌ Không tìm thấy thông tin phòng làm bài!'); return; }
       const exam = await getExam(room.examId);
       setDetail({ submission: sub, room, exam });
     } catch (err) {
