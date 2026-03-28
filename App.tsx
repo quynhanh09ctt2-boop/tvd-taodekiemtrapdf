@@ -233,7 +233,7 @@ function App() {
             <div className="text-center mb-10">
               <div className="text-8xl mb-4">📚</div>
               <h1 className="text-4xl font-bold text-teal-900 mb-2">Exam Online</h1>
-              <p className="text-teal-600 text-lg">Hệ thống thi trực tuyến</p>
+              <p className="text-teal-600 text-lg">Hệ thống làm bài kiểm tra trực tuyến</p>
             </div>
 
             <div className="space-y-4">
@@ -249,7 +249,7 @@ function App() {
                 </div>
                 <div className="flex-1">
                   <h2 className="text-xl font-bold text-gray-900">Học sinh</h2>
-                  <p className="text-gray-500">Nhập mã phòng để vào thi</p>
+                  <p className="text-gray-500">Nhập mã phòng để vào làm bài</p>
                 </div>
                 <div className="text-teal-500 text-2xl">→</div>
               </button>
@@ -266,7 +266,7 @@ function App() {
                 </div>
                 <div className="flex-1">
                   <h2 className="text-xl font-bold text-gray-900">Giáo viên</h2>
-                  <p className="text-gray-500">Đăng nhập để quản lý đề thi</p>
+                  <p className="text-gray-500">Đăng nhập để quản lý đề kiểm tra</p>
                 </div>
                 <div className="text-orange-500 text-2xl">→</div>
               </button>
@@ -288,7 +288,7 @@ function App() {
             </div>
 
             <p className="text-center text-teal-600 mt-8 text-sm">
-              Powered by Firebase • Made with ❤️
+              Powered by Firebase • Made with ❤️ QUỲNH ANH ❤️
             </p>
           </div>
         </div>
