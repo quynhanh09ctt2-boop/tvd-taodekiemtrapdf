@@ -3,8 +3,8 @@
 // ✅ Không cần Google Cloud Console, không cần OAuth popup
 
 // ─── ⚙️ CẤU HÌNH — SỬA 2 DÒNG NÀY ────────────────────────────────────────────
-const GAS_URL          = 'https://script.google.com/macros/s/AKfycbwb4h_n1Q8qNePDh7Msxnj_pr4CfJAyR0bRRHuKjR7hSEg3lXwGSb6nxEr8uFMjbaxh/exec';
-const GAS_SECRET_TOKEN = 'dethipdf2026'; // phải khớp với CONFIG.secretToken trong Code.gs
+const GAS_URL          = 'https://script.google.com/macros/s/AKfycbzmsM_sOioVyrYCEecEcmWp7fMfJvqLLgMHLJ1CbVAndYuNFyr-PXJct7T2CtLNACKg/exec';
+const GAS_SECRET_TOKEN = 'ĐekiemtraPDF'; // phải khớp với CONFIG.secretToken trong Code.gs
 // ───────────────────────────────────────────────────────────────────────────────
 
 export interface DriveUploadResult {
