@@ -187,7 +187,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           {/* Logo/Header */}
           <div className="text-center mb-6">
             <div className="text-5xl mb-4">📚</div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">Hệ thống Thi Trực tuyến</h1>
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">Hệ thống kiểm tra Trực tuyến</h1>
           </div>
 
           {/* WebView Warning */}
@@ -279,7 +279,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
           {/* Footer */}
           <div className="mt-6 text-center text-gray-500 text-sm">
-            <p>© 2026 Hệ thống Thi Trực tuyến</p>
+            <p>© 2026 Hệ thống kiểm tra Trực tuyến</p>
           </div>
         </div>
       </div>
@@ -292,7 +292,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         {/* Logo/Header */}
         <div className="text-center mb-8">
           <div className="text-5xl mb-4">📚</div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Hệ thống Thi Trực tuyến</h1>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Hệ thống kiểm tra Trực tuyến</h1>
           <p className="text-gray-600">Chọn vai trò của bạn để tiếp tục</p>
         </div>
 
@@ -307,7 +307,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             >
               <div className="text-2xl mb-2">🎓</div>
               <div className="text-lg">Học sinh</div>
-              <div className="text-sm opacity-90">Tham gia làm bài thi</div>
+              <div className="text-sm opacity-90">Tham gia làm bài kiểm tra</div>
             </button>
 
             {/* Teacher Login Button */}
@@ -318,7 +318,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             >
               <div className="text-2xl mb-2">👨‍🏫</div>
               <div className="text-lg">Giáo viên</div>
-              <div className="text-sm opacity-90">Tạo và quản lý bài thi</div>
+              <div className="text-sm opacity-90">Tạo và quản lý bài kiểm tra</div>
             </button>
 
             {/* Admin Login Button */}
@@ -388,7 +388,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               <div className="text-4xl mb-3">👨‍🏫</div>
               <h2 className="text-2xl font-bold text-gray-800">Đăng nhập làm Giáo viên</h2>
               <p className="text-gray-600 mt-2">
-                Bạn sẽ có quyền tạo, quản lý bài thi và xem kết quả
+                Bạn sẽ có quyền tạo, quản lý bài kiểm tra và xem kết quả
               </p>
             </div>
 
@@ -431,7 +431,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
         {/* Footer */}
         <div className="mt-8 text-center text-gray-600 text-sm">
-          <p>© 2026 Hệ thống Thi Trực tuyến. All rights reserved.</p>
+          <p>© 2026 Hệ thống kiểm tra Trực tuyến. All rights reserved.</p>
         </div>
       </div>
     </div>
