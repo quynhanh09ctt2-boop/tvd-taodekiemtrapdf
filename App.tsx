@@ -288,7 +288,7 @@ function App() {
             </div>
 
             <p className="text-center text-teal-600 mt-8 text-sm">
-              Powered by Firebase • Made with ❤️ QUỲNH ANH ❤️
+              Powered by Firebase • Made with ❤️ QUỲNH ANH TVD ❤️
             </p>
           </div>
         </div>
