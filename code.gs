@@ -10,9 +10,9 @@
 
 // ─── CẤU HÌNH ────────────────────────────────────────────────
 const CONFIG = {
-  folderName : 'ĐềThiPDF',    // Tên folder tự động tạo trên Drive
+  folderName : 'ĐekiemtraPDF',    // Tên folder tự động tạo trên Drive
   secretToken: 'THAY_BANG_MAT_KHAU_BI_MAT',  // ← đổi thành chuỗi bí mật bất kỳ
-                               //   ví dụ: 'taodepdf2024_secret'
+                               //   ví dụ: 'taodepdf2026_secret'
                                //   Phải khớp với GAS_SECRET_TOKEN trong React app
 };
 
