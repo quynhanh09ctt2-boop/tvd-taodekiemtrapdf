@@ -274,7 +274,7 @@ const ResultView: React.FC<ResultViewProps> = ({
                 <div className="text-6xl mb-4">🔒</div>
                 <h3 className="text-xl font-bold text-gray-800 mb-2">Không thể xem đáp án</h3>
                 <p className="text-gray-600">
-                  Giáo viên chưa cho phép xem đáp án và lời giải cho bài thi này.
+                  Giáo viên chưa cho phép xem đáp án và lời giải cho bài kiểm tra này.
                 </p>
               </div>
             )}
