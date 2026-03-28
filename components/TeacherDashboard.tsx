@@ -473,8 +473,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
       <div className="max-w-6xl mx-auto px-4 py-4">
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
           {[
-            { id: 'exams', label: '📚 Đề thi', count: exams.length },
-            { id: 'rooms', label: '🏠 Phòng thi', count: rooms.length },
+            { id: 'exams', label: '📚 Đề kiểm tra', count: exams.length },
+            { id: 'rooms', label: '🏠 Phòng làm bài', count: rooms.length },
             { id: 'results', label: '📊 Kết quả', count: rooms.filter((r) => r.submittedCount > 0).length },
             { id: 'classes', label: '👥 Lớp học', count: classes.length }
           ].map((tab) => (
