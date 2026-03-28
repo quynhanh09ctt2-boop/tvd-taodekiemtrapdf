@@ -227,23 +227,23 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
       await ensureSignedIn();
 
       const room = await getRoomByCode(roomCode.trim().toUpperCase());
-      if (!room)                                             { alert('❌ Không tìm thấy phòng thi với mã này!'); return; }
-      if (room.status === 'closed')                          { alert('❌ Phòng thi đã đóng!'); return; }
-      if (room.status === 'waiting' && !room.allowLateJoin)  { alert('❌ Phòng thi chưa bắt đầu!'); return; }
+      if (!room)                                             { alert('❌ Không tìm thấy phòng kiểm tra với mã này!'); return; }
+      if (room.status === 'closed')                          { alert('❌ Phòng kiểm tra đã đóng!'); return; }
+      if (room.status === 'waiting' && !room.allowLateJoin)  { alert('❌ Phòng kiểm tra chưa bắt đầu!'); return; }
 
       const now = Date.now();
       if (room.opensAt && now < new Date(room.opensAt).getTime()) {
-        alert(`⏳ Phòng thi chưa mở!\nSẽ mở lúc: ${new Date(room.opensAt).toLocaleString('vi-VN')}`);
+        alert(`⏳ Phòng kiểm tra chưa mở!\nSẽ mở lúc: ${new Date(room.opensAt).toLocaleString('vi-VN')}`);
         return;
       }
       if (room.closesAt && now >= new Date(room.closesAt).getTime()) {
-        alert(`⛔ Phòng thi đã hết giờ!\nĐã đóng lúc: ${new Date(room.closesAt).toLocaleString('vi-VN')}`);
+        alert(`⛔ Phòng kiểm tra đã hết giờ!\nĐã đóng lúc: ${new Date(room.closesAt).toLocaleString('vi-VN')}`);
         return;
       }
 
       // Với credential user, bỏ qua kiểm tra classId vì GV đã assign
       if (loginMode === 'google' && room.classId && !currentUser.classIds?.includes(room.classId)) {
-        alert(`❌ Bạn không thuộc lớp "${room.className || 'này'}"!\n\nPhòng thi này chỉ dành cho học sinh trong lớp.`);
+        alert(`❌ Bạn không thuộc lớp "${room.className || 'này'}"!\n\nPhòng này chỉ dành cho học sinh trong lớp.`);
         return;
       }
 
@@ -289,7 +289,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
       if (!uid) throw new Error('Anonymous auth failed');
 
       const room = await getRoomByCode(roomCode.trim().toUpperCase());
-      if (!room) { alert('❌ Không tìm thấy phòng thi với mã này!'); return; }
+      if (!room) { alert('❌ Không tìm thấy phòng kiểm tra với mã này!'); return; }
 
       if (!room.allowAnonymous) {
         alert('⚠️ Phòng này yêu cầu đăng nhập!\n\nVui lòng quay lại và chọn "Tài khoản học sinh" hoặc "Đăng nhập Google".');
@@ -301,11 +301,11 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
 
       const now = Date.now();
       if (room.opensAt && now < new Date(room.opensAt).getTime()) {
-        alert(`⏳ Phòng thi chưa mở!\nSẽ mở lúc: ${new Date(room.opensAt).toLocaleString('vi-VN')}`);
+        alert(`⏳ Phòng kiểm tra chưa mở!\nSẽ mở lúc: ${new Date(room.opensAt).toLocaleString('vi-VN')}`);
         return;
       }
       if (room.closesAt && now >= new Date(room.closesAt).getTime()) {
-        alert(`⛔ Phòng thi đã hết giờ!\nĐã đóng lúc: ${new Date(room.closesAt).toLocaleString('vi-VN')}`);
+        alert(`⛔ Phòng kiểm tra đã hết giờ!\nĐã đóng lúc: ${new Date(room.closesAt).toLocaleString('vi-VN')}`);
         return;
       }
 
@@ -359,7 +359,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
           <div className="text-center mb-8">
             <div className="text-7xl mb-4">🎓</div>
             <h1 className="text-4xl font-bold text-teal-900 mb-2">Cổng Học Sinh</h1>
-            <p className="text-teal-600">Chọn cách vào phòng thi</p>
+            <p className="text-teal-600">Chọn cách vào phòng kiểm tra</p>
           </div>
 
           <div className="space-y-3">
@@ -527,7 +527,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
             <div className="text-center mb-6">
               <div className="text-6xl mb-3">✍️</div>
               <h1 className="text-2xl font-bold text-gray-900">Thi tự do</h1>
-              <p className="text-gray-500 mt-1 text-sm">Nhập thông tin để vào thi</p>
+              <p className="text-gray-500 mt-1 text-sm">Nhập thông tin để vào làm bài</p>
             </div>
 
             <div className="space-y-4 mb-6">
@@ -592,7 +592,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
                     Đang xử lý...
                   </span>
-                ) : '🚀 Vào thi'}
+                ) : '🚀 Vào làm bài kiểm tra'}
               </button>
 
               <button
@@ -605,7 +605,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
             </div>
 
             <div className="mt-5 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg text-sm text-yellow-800">
-              ⚠️ <strong>Lưu ý:</strong> Chế độ thi tự do không lưu tài khoản.
+              ⚠️ <strong>Lưu ý:</strong> Chế độ làm bài tự do không lưu tài khoản.
             </div>
           </div>
         </div>
@@ -621,7 +621,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
           <div className="text-center mb-8">
             <div className="text-7xl mb-4">🎓</div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Cổng Học Sinh</h1>
-            <p className="text-gray-600">Đăng nhập Google để vào thi</p>
+            <p className="text-gray-600">Đăng nhập Google để vào làm bài</p>
           </div>
 
           <div className="bg-white rounded-2xl shadow-2xl p-8">
@@ -751,14 +751,14 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
             </button>
           </div>
 
-          {/* ── Tab: Vào thi ── */}
+          {/* ── Tab: Vào làm bài kiểm tra ── */}
           {activeTab === 'join' && (
             <div className="space-y-4">
-              {/* Danh sách phòng thi */}
+              {/* Danh sách phòng kiểm tra */}
               {hasClass && (
                 <div className="bg-white rounded-2xl shadow-xl p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-bold text-gray-800">📌 Phòng thi của bạn</h2>
+                    <h2 className="font-bold text-gray-800">📌 Phòng làm bài của bạn</h2>
                     <button
                       onClick={() => currentUser && fetchAvailableRooms(currentUser)}
                       disabled={isLoadingRooms}
@@ -775,7 +775,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
                   ) : availableRooms.length === 0 ? (
                     <div className="py-8 text-center text-gray-400">
                       <div className="text-4xl mb-2">🔍</div>
-                      <p className="text-sm">Không có phòng thi nào đang mở</p>
+                      <p className="text-sm">Không có phòng nào đang mở</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -818,7 +818,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
                       Đang kiểm tra...
                     </span>
-                  ) : '🚀 Vào Phòng Thi'}
+                  ) : '🚀 Vào Phòng làm bài'}
                 </button>
               </div>
             </div>
@@ -844,7 +844,7 @@ const RoomCard: React.FC<{
 }> = ({ room, onJoin, disabled }) => {
   const statusBadge =
     room.status === 'active'
-      ? { label: '🟢 Đang thi', cls: 'bg-green-100 text-green-700' }
+      ? { label: '🟢 Đang làm bài', cls: 'bg-green-100 text-green-700' }
       : { label: '🟡 Chờ mở', cls: 'bg-yellow-100 text-yellow-700' };
 
   const closesAt = room.closesAt ? new Date(room.closesAt) : null;
