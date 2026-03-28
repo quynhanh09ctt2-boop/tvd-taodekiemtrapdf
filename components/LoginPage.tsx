@@ -307,7 +307,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             >
               <div className="text-2xl mb-2">🎓</div>
               <div className="text-lg">Học sinh</div>
-              <div className="text-sm opacity-90">Tham gia làm bài kiểm tra</div>
+              <div className="text-sm opacity-90">Tham gia làm bài thi</div>
             </button>
 
             {/* Teacher Login Button */}
@@ -318,7 +318,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             >
               <div className="text-2xl mb-2">👨‍🏫</div>
               <div className="text-lg">Giáo viên</div>
-              <div className="text-sm opacity-90">Tạo và quản lý bài kiểm tra</div>
+              <div className="text-sm opacity-90">Tạo và quản lý bài thi</div>
             </button>
 
             {/* Admin Login Button */}
@@ -388,7 +388,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               <div className="text-4xl mb-3">👨‍🏫</div>
               <h2 className="text-2xl font-bold text-gray-800">Đăng nhập làm Giáo viên</h2>
               <p className="text-gray-600 mt-2">
-                Bạn sẽ có quyền tạo, quản lý bài kiểm tra và xem kết quả
+                Bạn sẽ có quyền tạo, quản lý bài thi và xem kết quả
               </p>
             </div>
 

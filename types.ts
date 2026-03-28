@@ -1,4 +1,5 @@
 // ============ ENUMS ============
+
 export enum Role {
   STUDENT = 'student',
   TEACHER = 'teacher',
@@ -8,40 +9,129 @@ export enum Role {
   LEADER = 'leader'
 }
 
-export type QuestionType = 'multiple_choice' | 'true_false' | 'short_answer' | 'writing' | 'unknown';
-export type TrueFalseMode = 'equal' | 'stepped' | 'none';
+// ============ QUESTION TYPES ============
 
-// ============ INTERFACES ============
+export type QuestionType =
+  | 'multiple_choice'
+  | 'true_false'
+  | 'short_answer'
+  | 'writing'
+  | 'unknown';
+
+// ============ IMAGE DATA ============
+
+export interface ImageData {
+  id: string;
+  filename: string;
+  base64: string;
+  contentType: string;
+  rId?: string;
+}
+
+// ============ USER ============
+
+export interface User {
+  id: string;
+  name: string;
+  email?: string;
+  avatar?: string;
+  role: Role;
+  status?: 'online' | 'offline' | 'busy';
+  isApproved?: boolean;
+  createdAt?: Date;
+  classIds?: string[];
+}
+
+// ============ CLASS ============
+
+export interface Class {
+  id: string;
+  name: string;
+  grade?: string;
+  subject?: string;
+  teacherId: string;
+  teacherName: string;
+  studentIds: string[];
+  totalStudents: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// ============ STUDENT INFO ============
+
+export interface StudentInfo {
+  id: string;
+  name: string;
+  email?: string;
+  avatar?: string;
+  className?: string;
+  classId?: string;
+  studentId?: string;
+}
+
+// ============ QUESTION & OPTIONS ============
 
 export interface QuestionOption {
-  id: string;
+  letter: string;
   text: string;
-  letter: string; 
-  textWithUnderline?: boolean;
+  textWithUnderline?: string;
+  isCorrect?: boolean;
+}
+
+export interface SectionInfo {
+  letter: string;
+  name: string;
+  points: string;
 }
 
 export interface Question {
-  id: string;
   number: number;
-  type: QuestionType;
   text: string;
+  type: QuestionType;
   options: QuestionOption[];
-  correctAnswer: string;
-  solution?: string;
+  correctAnswer: string | null;
+  section?: SectionInfo;
+  part?: string;
   passage?: string;
-  part?: number;
-  section?: string;
+  solution?: string;
+  images?: ImageData[];
+  tfStatements?: { [key: string]: string };
 }
+
+// ============ EXAM SECTION ============
+
+export interface ExamSection {
+  name: string;
+  description: string;
+  points: string;
+  readingPassage?: string;
+  questions: Question[];
+  sectionType?: QuestionType;
+}
+
+// ============ EXAM DATA ============
+
+export interface ExamData {
+  title: string;
+  subject?: 'math' | 'english' | 'other';
+  timeLimit?: number;
+  sections: ExamSection[];
+  questions: Question[];
+  answers: { [key: number]: string };
+  images?: ImageData[];
+}
+
+// ============ FLEXIBLE SCORING SYSTEM ============
+
+export type TrueFalseMode = 'equal' | 'stepped';
 
 export interface SectionPointsConfig {
   sectionId: string;
-  sectionName?: string;
-  part: number;
+  sectionName: string;
   questionType: 'multiple_choice' | 'true_false' | 'short_answer';
-  count: number;
+  totalQuestions: number;
   totalPoints: number;
   pointsPerQuestion: number;
-  totalQuestions?: number;
   trueFalseMode?: TrueFalseMode;
 }
 
@@ -51,94 +141,198 @@ export interface ExamPointsConfig {
   autoBalance?: boolean;
 }
 
-export interface ExamData {
-  title: string;
-  description?: string;
-  questions: Question[];
-  totalQuestions: number;
-  answers?: { [key: number]: any };
+// ============ ROOM SETTINGS ============
+
+export interface RoomSettings {
+  allowLateJoin: boolean;
+  showResultAfterSubmit: boolean;
+  shuffleQuestions: boolean;
+  maxAttempts: number;
+  allowAnonymous: boolean;
+  showCorrectAnswers: boolean;
+  showExplanations: boolean;
+  showAnswersAfterClose?: boolean;
+  allowReview?: boolean;
 }
 
-export interface Exam {
-  id: string;
-  title: string;
-  description?: string;
-  questions: Question[];
-  createdAt: any;
-  teacherId: string;
-  pointsConfig?: ExamPointsConfig;
-}
-
-export interface User {
-  id: string;
-  uid?: string;
-  name: string;
-  email?: string;
-  role: Role;
-  isApproved: boolean;
-  photoURL?: string;
-  className?: string;
-  username?: string;
-  password?: string;
-}
+// ============ ROOM ============
 
 export interface Room {
   id: string;
   code: string;
   examId: string;
+  examTitle: string;
   teacherId: string;
-  status: 'waiting' | 'active' | 'closed';
-  opensAt?: any; 
-  closesAt?: any;
-  timeLimit?: number;
-  className?: string;
+  teacherName: string;
   classId?: string;
-  settings: {
-    duration: number;
-    shuffledQuestions: boolean;
-    shuffledOptions: boolean;
-    showResults: boolean;
-    allowReview: boolean;
-    maxAttempts: number;
-    pdfUrl?: string;
-    [key: string]: any;
-  };
-}
-
-export interface StudentInfo {
-  id: string;
-  name: string;
-  studentId?: string;
-  email?: string;
   className?: string;
+  status: 'waiting' | 'active' | 'closed';
+  startTime?: Date;
+  endTime?: Date;
+  timeLimit: number;
+  settings: RoomSettings;
+  allowLateJoin?: boolean;
+  showResultAfterSubmit?: boolean;
+  shuffleQuestions?: boolean;
+  maxAttempts?: number;
+  allowAnonymous?: boolean;
+  totalStudents: number;
+  submittedCount: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+  opensAt?: Date;
+  closesAt?: Date;
 }
 
-export interface ScoreCategory {
-  correct: number;
-  total: number;
-  points: number;
+// ============ EXAM ============
+
+export interface Exam {
+  id: string;
+  title: string;
+  description?: string;
+  subject?: string;
+  timeLimit: number;
+  questions: Question[];
+  sections: ExamSection[];
+  answers: { [key: number]: string };
+  images?: ImageData[];
+  createdBy: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  pointsConfig?: ExamPointsConfig;
+
+  // ✅ PDF lưu trên Google Drive (ưu tiên)
+  pdfDriveUrl?: string;      // https://drive.google.com/file/d/{id}/view
+  pdfDriveFileId?: string;   // File ID để tạo preview URL trong iframe
+
+  // Backward compat — PDF base64 cũ lưu theo chunks trong subcollection
+  hasPdfSubcollection?: boolean;
+  pdfBase64?: string;        // runtime only, không lưu Firestore
 }
+
+// ============ SCORE BREAKDOWN ============
 
 export interface ScoreBreakdown {
-  multipleChoice: ScoreCategory;
-  trueFalse: ScoreCategory;
-  shortAnswer: ScoreCategory;
+  multipleChoice: {
+    total: number;
+    correct: number;
+    points: number;
+    pointsPerQuestion?: number;
+  };
+  trueFalse: {
+    total: number;
+    correct: number;
+    partial: number;
+    points: number;
+    pointsPerQuestion?: number;
+    details: {
+      [questionNumber: number]: {
+        correctCount: number;
+        points: number;
+      };
+    };
+  };
+  shortAnswer: {
+    total: number;
+    correct: number;
+    points: number;
+    pointsPerQuestion?: number;
+  };
+  totalScore: number;
+  percentage: number;
 }
+
+// ============ SUBMISSION ============
 
 export interface Submission {
   id: string;
   roomId: string;
+  roomCode: string;
   examId: string;
   student: StudentInfo;
-  answers: { [key: number]: any };
-  score: number;
+  answers: { [questionNumber: number]: string };
+  scoreBreakdown: ScoreBreakdown;
   totalScore: number;
   percentage: number;
+  score: number;
   correctCount: number;
   wrongCount: number;
   totalQuestions: number;
+  tabSwitchCount: number;
+  tabSwitchWarnings: Date[];
+  autoSubmitted: boolean;
+  startedAt?: Date;
+  submittedAt?: Date;
   duration: number;
-  submittedAt: any;
-  tabSwitchCount?: number;
-  scoreBreakdown?: ScoreBreakdown; // Chuyển thành optional để tránh crash khi chưa có data
+  status: 'in_progress' | 'submitted' | 'graded';
+}
+
+// ============ ROOM WITH EXAM ============
+
+export interface RoomWithExam extends Room {
+  exam: Exam;
+}
+
+// ============ LEADERBOARD ============
+
+export interface LeaderboardEntry {
+  rank: number;
+  student: StudentInfo;
+  score: number;
+  percentage: number;
+  duration: number;
+  submittedAt?: Date;
+  scoreBreakdown?: ScoreBreakdown;
+}
+
+// ============ STUDENT ACCOUNT (tài khoản do giáo viên tạo) ============
+
+export interface StudentAccount {
+  id: string;           // = username (document ID trong Firestore)
+  username: string;     // tên đăng nhập, lowercase, unique
+  passwordHash: string; // SHA-256 hex
+  name: string;         // Họ tên hiển thị
+  classId?: string;     // ID lớp (ref đến collection "classes")
+  className?: string;   // Tên lớp hiển thị
+  teacherId: string;    // UID giáo viên tạo tài khoản
+  isActive: boolean;    // cho phép đăng nhập hay không
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface CreateStudentAccountInput {
+  username: string;
+  password: string;     // plain text, sẽ được hash trước khi lưu
+  name: string;
+  classId?: string;
+  className?: string;
+  teacherId: string;
+}
+
+export interface BulkImportStudentRow {
+  name: string;         // cột ho_ten
+  username: string;     // cột ten_dang_nhap
+  password: string;     // cột mat_khau
+  className?: string;   // cột lop (không bắt buộc)
+}
+
+export interface BulkImportResult {
+  success: number;
+  failed: number;
+  errors: string[];
+}
+
+// ============ CLASS JOIN REQUEST ============
+
+export interface ClassJoinRequest {
+  id: string;
+  classId: string;
+  className: string;
+  studentId: string;
+  studentName: string;
+  studentEmail?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt?: Date;
+  processedAt?: Date;
+  processedBy?: string;
 }

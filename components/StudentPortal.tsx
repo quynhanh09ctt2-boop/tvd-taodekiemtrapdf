@@ -1,3 +1,6 @@
+// src/components/StudentPortal.tsx
+// ✅ Cập nhật: Thêm đăng nhập bằng tài khoản học sinh (username/password)
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Role, Room, StudentInfo } from '../types';
 import {
@@ -11,6 +14,10 @@ import {
   getClass,
   ensureSignedIn,
 } from '../services/firebaseService';
+import {
+  loginWithStudentAccount,
+  getStudentAccountByUsername,
+} from '../services/studentAccountService';
 import StudentHistory from './StudentHistory';
 
 interface StudentPortalProps {
@@ -18,7 +25,8 @@ interface StudentPortalProps {
   onBack?: () => void;
 }
 
-type LoginMode = 'select' | 'google' | 'anonymous';
+// Thêm 'credential' vào các mode đăng nhập
+type LoginMode = 'select' | 'google' | 'anonymous' | 'credential';
 type ActiveTab  = 'join' | 'history';
 
 const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => {
@@ -27,19 +35,26 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
   const [isLoading, setIsLoading]   = useState(true);
   const [activeTab, setActiveTab]   = useState<ActiveTab>('join');
 
-  // Available rooms for student's classes
+  // Available rooms
   const [availableRooms, setAvailableRooms]   = useState<Room[]>([]);
   const [isLoadingRooms, setIsLoadingRooms]   = useState(false);
 
-  // Room code input (manual fallback)
+  // Room code input
   const [roomCode, setRoomCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
 
-  // Anonymous mode fields
+  // Anonymous mode
   const [studentName, setStudentName] = useState('');
   const [className, setClassName]     = useState('');
 
-  // Resolved class names (from classIds)
+  // ── Credential login state ──
+  const [credUsername, setCredUsername] = useState('');
+  const [credPassword, setCredPassword] = useState('');
+  const [credError, setCredError]       = useState('');
+  const [isCredLoading, setIsCredLoading] = useState(false);
+  const [showCredPassword, setShowCredPassword] = useState(false);
+
+  // Class names resolved from IDs
   const [userClassNames, setUserClassNames] = useState<string[]>([]);
 
   // ── Helpers ──
@@ -66,7 +81,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
     }
   }, []);
 
-  // ── Auth listener ──
+  // ── Auth listener (chỉ cho Google auth) ──
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser && !firebaseUser.isAnonymous) {
@@ -92,6 +107,9 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
     setRoomCode('');
     setStudentName('');
     setClassName('');
+    setCredUsername('');
+    setCredPassword('');
+    setCredError('');
   };
 
   const handleGoogleLogin = async () => {
@@ -109,20 +127,58 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
     }
   };
 
+  // ── Credential login ──────────────────────────────────────
+  const handleCredentialLogin = async () => {
+    setCredError('');
+    if (!credUsername.trim()) { setCredError('Vui lòng nhập tên đăng nhập.'); return; }
+    if (!credPassword) { setCredError('Vui lòng nhập mật khẩu.'); return; }
+
+    setIsCredLoading(true);
+    try {
+      const user = await loginWithStudentAccount(credUsername.trim(), credPassword);
+      if (!user) {
+        setCredError('Tên đăng nhập hoặc mật khẩu không đúng.');
+        return;
+      }
+
+      // Lấy thêm thông tin classNames từ account
+      const account = await getStudentAccountByUsername(credUsername.trim());
+      if (account?.className) {
+        setUserClassNames([account.className]);
+      }
+
+      setCurrentUser(user);
+
+      // Lấy phòng thi nếu có classId
+      if (user.classIds && user.classIds.length > 0) {
+        fetchAvailableRooms(user);
+      }
+    } catch (err: any) {
+      setCredError(err.message || 'Có lỗi xảy ra. Vui lòng thử lại.');
+    } finally {
+      setIsCredLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
-      await signOutUser();
+      // Chỉ sign out Firebase nếu đang dùng Google auth
+      if (loginMode === 'google') {
+        await signOutUser();
+      }
       setCurrentUser(null);
       setUserClassNames([]);
       setAvailableRooms([]);
       setLoginMode('select');
       setRoomCode('');
+      setCredUsername('');
+      setCredPassword('');
     } catch (err) {
       console.error('Logout error:', err);
     }
   };
 
-  // ── Join room directly from the list ──
+  // ── Join room direct (from list) ──────────────────────────
   const handleJoinRoomDirect = async (room: Room) => {
     if (!currentUser) return;
     setIsJoining(true);
@@ -155,32 +211,26 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
     }
   };
 
-  // ── Join room via manual code (Google mode) ──
-  const handleJoinRoomGoogle = async () => {
+  // ── Join room via code (Google or Credential mode) ─────────
+  const handleJoinRoomWithAccount = async () => {
     if (!roomCode.trim()) { alert('⚠️ Vui lòng nhập mã phòng!'); return; }
     if (!currentUser)     { alert('⚠️ Vui lòng đăng nhập trước!'); return; }
 
-    if (currentUser.role !== Role.STUDENT) {
-      alert('⚠️ Tài khoản này không phải HỌC SINH.\n\nVui lòng đăng xuất và đăng nhập ở Cổng Giáo viên.');
-      return;
-    }
     if (!currentUser.isApproved) {
-      alert('⚠️ Tài khoản của bạn chưa được Admin duyệt!\n\nVui lòng chờ Admin duyệt tài khoản.');
-      return;
-    }
-    if (!currentUser.classIds || currentUser.classIds.length === 0) {
-      alert('⚠️ Bạn chưa được thêm vào lớp nào!\n\nVui lòng liên hệ giáo viên để được thêm vào lớp.');
+      alert('⚠️ Tài khoản chưa được duyệt!\n\nLiên hệ giáo viên để được kích hoạt.');
       return;
     }
 
     setIsJoining(true);
     try {
+      // Đảm bảo có Firebase anonymous auth để Firestore security rules hoạt động
+      await ensureSignedIn();
+
       const room = await getRoomByCode(roomCode.trim().toUpperCase());
       if (!room)                                             { alert('❌ Không tìm thấy phòng thi với mã này!'); return; }
       if (room.status === 'closed')                          { alert('❌ Phòng thi đã đóng!'); return; }
       if (room.status === 'waiting' && !room.allowLateJoin)  { alert('❌ Phòng thi chưa bắt đầu!'); return; }
 
-      // Kiểm tra thời gian mở/đóng
       const now = Date.now();
       if (room.opensAt && now < new Date(room.opensAt).getTime()) {
         alert(`⏳ Phòng thi chưa mở!\nSẽ mở lúc: ${new Date(room.opensAt).toLocaleString('vi-VN')}`);
@@ -191,8 +241,8 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
         return;
       }
 
-      // Kiểm tra lớp
-      if (room.classId && !currentUser.classIds?.includes(room.classId)) {
+      // Với credential user, bỏ qua kiểm tra classId vì GV đã assign
+      if (loginMode === 'google' && room.classId && !currentUser.classIds?.includes(room.classId)) {
         alert(`❌ Bạn không thuộc lớp "${room.className || 'này'}"!\n\nPhòng thi này chỉ dành cho học sinh trong lớp.`);
         return;
       }
@@ -210,7 +260,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
         name: currentUser.name,
         email: currentUser.email,
         avatar: currentUser.avatar,
-        className: studentClassName,
+        className: studentClassName || userClassNames[0],
       };
 
       const existingSubmission = await getStudentSubmission(room.id, currentUser.id);
@@ -227,7 +277,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
     }
   };
 
-  // ── Join room (Anonymous) ──
+  // ── Join room (Anonymous) ──────────────────────────────────
   const handleJoinRoomAnonymous = async () => {
     if (!roomCode.trim())    { alert('⚠️ Vui lòng nhập mã phòng!'); return; }
     if (!studentName.trim()) { alert('⚠️ Vui lòng nhập họ tên!'); return; }
@@ -242,7 +292,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
       if (!room) { alert('❌ Không tìm thấy phòng thi với mã này!'); return; }
 
       if (!room.allowAnonymous) {
-        alert('⚠️ Phòng này yêu cầu đăng nhập Google!\n\nVui lòng quay lại và chọn "Đăng nhập Google".');
+        alert('⚠️ Phòng này yêu cầu đăng nhập!\n\nVui lòng quay lại và chọn "Tài khoản học sinh" hoặc "Đăng nhập Google".');
         return;
       }
 
@@ -274,9 +324,9 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
     }
   };
 
-  // ═══════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════
   // RENDER
-  // ═══════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════
 
   if (isLoading) {
     return (
@@ -289,7 +339,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
     );
   }
 
-  // ── CHỌN PHƯƠNG THỨC ĐĂNG NHẬP ──
+  // ── CHỌN PHƯƠNG THỨC ĐĂNG NHẬP ──────────────────────────
   if (loginMode === 'select' && !currentUser) {
     return (
       <div
@@ -306,57 +356,166 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
             </button>
           )}
 
-          <div className="text-center mb-10">
-            <div className="text-8xl mb-4">🎓</div>
+          <div className="text-center mb-8">
+            <div className="text-7xl mb-4">🎓</div>
             <h1 className="text-4xl font-bold text-teal-900 mb-2">Cổng Học Sinh</h1>
-            <p className="text-teal-600 text-lg">Chọn cách vào phòng thi</p>
+            <p className="text-teal-600">Chọn cách vào phòng thi</p>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
+            {/* ✅ MỚI: Tài khoản học sinh */}
+            <button
+              onClick={() => setLoginMode('credential')}
+              className="w-full bg-white rounded-2xl p-5 shadow-xl hover:shadow-2xl transition transform hover:scale-[1.02] text-left flex items-center gap-4 border-2 border-teal-200"
+            >
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 bg-gradient-to-br from-teal-500 to-teal-700">
+                🔑
+              </div>
+              <div className="flex-1">
+                <h2 className="text-lg font-bold text-gray-900">Tài khoản học sinh</h2>
+                <p className="text-gray-500 text-sm">Đăng nhập bằng user & mật khẩu do GV cấp</p>
+              </div>
+              <div className="bg-teal-100 text-teal-700 text-xs font-bold px-2 py-1 rounded-full">⭐ Mới</div>
+            </button>
+
+            {/* Google */}
             <button
               onClick={() => setLoginMode('google')}
-              className="w-full bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition transform hover:scale-105 text-left flex items-center gap-5"
+              className="w-full bg-white rounded-2xl p-5 shadow-xl hover:shadow-2xl transition transform hover:scale-[1.02] text-left flex items-center gap-4"
             >
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #4285F4 0%, #34A853 50%, #FBBC05 75%, #EA4335 100%)' }}
-              >
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg, #4285F4, #34A853, #FBBC05, #EA4335)' }}>
                 🔐
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold text-gray-900">Đăng nhập Google</h2>
-                <p className="text-gray-500">Dùng tài khoản Google • Lưu kết quả lâu dài</p>
+                <h2 className="text-lg font-bold text-gray-900">Đăng nhập Google</h2>
+                <p className="text-gray-500 text-sm">Dùng tài khoản Gmail • Lưu kết quả lâu dài</p>
               </div>
-              <div className="text-teal-500 text-2xl">→</div>
+              <div className="text-teal-500 text-xl">→</div>
             </button>
 
+            {/* Anonymous */}
             <button
               onClick={() => setLoginMode('anonymous')}
-              className="w-full bg-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition transform hover:scale-105 text-left flex items-center gap-5"
+              className="w-full bg-white rounded-2xl p-5 shadow-xl hover:shadow-2xl transition transform hover:scale-[1.02] text-left flex items-center gap-4"
             >
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0"
-                style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' }}
-              >
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)' }}>
                 ✍️
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold text-gray-900">Thi tự do</h2>
-                <p className="text-gray-500">Chỉ cần nhập tên • Không cần tài khoản</p>
+                <h2 className="text-lg font-bold text-gray-900">Thi tự do</h2>
+                <p className="text-gray-500 text-sm">Chỉ cần nhập tên • Không cần tài khoản</p>
               </div>
-              <div className="text-orange-500 text-2xl">→</div>
+              <div className="text-orange-500 text-xl">→</div>
             </button>
           </div>
 
-          <p className="text-center text-teal-600 mt-8 text-sm">
-            💡 Chế độ "Thi tự do" chỉ khả dụng nếu giáo viên bật tính năng này
+          <p className="text-center text-teal-600 mt-6 text-xs">
+            💡 "Thi tự do" chỉ khả dụng nếu giáo viên bật tính năng này
           </p>
         </div>
       </div>
     );
   }
 
-  // ── THI TỰ DO ──
+  // ── ĐĂNG NHẬP BẰNG TÀI KHOẢN HỌC SINH ──────────────────
+  if (loginMode === 'credential' && !currentUser) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center p-4"
+        style={{ background: 'linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 50%, #99f6e4 100%)' }}
+      >
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="p-6 text-center" style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)' }}>
+              <div className="text-5xl mb-2">🔑</div>
+              <h1 className="text-2xl font-bold text-white">Đăng nhập Học sinh</h1>
+              <p className="text-teal-200 text-sm mt-1">Dùng tài khoản do giáo viên cấp</p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {credError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center gap-2">
+                  <span>❌</span> {credError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Tên đăng nhập
+                </label>
+                <input
+                  type="text"
+                  value={credUsername}
+                  onChange={e => { setCredUsername(e.target.value.toLowerCase()); setCredError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleCredentialLogin()}
+                  placeholder="Ví dụ: nguyenvanan"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:outline-none font-mono text-lg"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  disabled={isCredLoading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Mật khẩu
+                </label>
+                <div className="relative">
+                  <input
+                    type={showCredPassword ? 'text' : 'password'}
+                    value={credPassword}
+                    onChange={e => { setCredPassword(e.target.value); setCredError(''); }}
+                    onKeyDown={e => e.key === 'Enter' && handleCredentialLogin()}
+                    placeholder="Nhập mật khẩu"
+                    className="w-full px-4 py-3 pr-12 border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:outline-none text-lg"
+                    disabled={isCredLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCredPassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showCredPassword ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                onClick={handleCredentialLogin}
+                disabled={isCredLoading || !credUsername.trim() || !credPassword}
+                className="w-full py-3.5 rounded-xl font-bold text-white text-lg transition disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0f766e 100%)' }}
+              >
+                {isCredLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                    Đang đăng nhập...
+                  </span>
+                ) : '🚀 Đăng nhập'}
+              </button>
+
+              <button
+                onClick={handleBackToSelect}
+                disabled={isCredLoading}
+                className="w-full py-3 rounded-xl font-semibold border-2 border-gray-200 hover:bg-gray-50 transition text-gray-600 disabled:opacity-50"
+              >
+                ← Quay lại
+              </button>
+
+              <div className="p-3 bg-teal-50 rounded-xl border border-teal-100 text-xs text-teal-700 text-center">
+                💬 Liên hệ giáo viên nếu bạn chưa có tài khoản hoặc quên mật khẩu
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── THI TỰ DO ────────────────────────────────────────────
   if (loginMode === 'anonymous') {
     return (
       <div
@@ -446,7 +605,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
             </div>
 
             <div className="mt-5 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg text-sm text-yellow-800">
-              ⚠️ <strong>Lưu ý:</strong> Chế độ thi tự do không lưu tài khoản. Kết quả gắn với phiên thi ẩn danh.
+              ⚠️ <strong>Lưu ý:</strong> Chế độ thi tự do không lưu tài khoản.
             </div>
           </div>
         </div>
@@ -454,7 +613,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
     );
   }
 
-  // ── GOOGLE CHƯA ĐĂNG NHẬP ──
+  // ── GOOGLE CHƯA ĐĂNG NHẬP ─────────────────────────────────
   if (loginMode === 'google' && !currentUser) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-teal-50 to-green-50 p-4">
@@ -498,17 +657,13 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
             >
               ← Quay lại
             </button>
-
-            <p className="text-center text-sm text-gray-500 mt-4">
-              Lần đầu đăng nhập? Tài khoản sẽ được tạo tự động
-            </p>
           </div>
         </div>
       </div>
     );
   }
 
-  // ── CHƯA ĐƯỢC DUYỆT ──
+  // ── CHƯA ĐƯỢC DUYỆT ──────────────────────────────────────
   if (currentUser && !currentUser.isApproved) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 to-orange-50 p-4">
@@ -516,16 +671,12 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
           <div className="bg-white rounded-2xl shadow-2xl p-8 text-center">
             <div className="text-7xl mb-4">⏳</div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Chờ duyệt tài khoản</h2>
-            <p className="text-gray-600 mb-2">
-              Xin chào <strong>{currentUser.name}</strong>!
-            </p>
+            <p className="text-gray-600 mb-2">Xin chào <strong>{currentUser.name}</strong>!</p>
             <p className="text-gray-500 text-sm mb-8">
-              Tài khoản của bạn đang chờ Admin phê duyệt. Sau khi được duyệt, bạn sẽ vào thi được.
+              Tài khoản của bạn đang chờ Admin phê duyệt.
             </p>
-            <button
-              onClick={handleLogout}
-              className="w-full py-3 border-2 border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 transition"
-            >
+            <button onClick={handleLogout}
+              className="w-full py-3 border-2 border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 transition">
               Đăng xuất
             </button>
           </div>
@@ -534,9 +685,9 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
     );
   }
 
-  // ── ĐÃ DUYỆT — GIAO DIỆN CHÍNH ──
+  // ── ĐÃ ĐĂNG NHẬP — GIAO DIỆN CHÍNH ──────────────────────
   if (currentUser && currentUser.isApproved) {
-    const hasClass = userClassNames.length > 0;
+    const hasClass = userClassNames.length > 0 || (currentUser.classIds && currentUser.classIds.length > 0);
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-teal-50 via-blue-50 to-purple-50 p-4">
@@ -555,16 +706,15 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
                 )}
                 <div>
                   <h2 className="text-lg font-bold text-gray-800">{currentUser.name}</h2>
-                  {hasClass
+                  {userClassNames.length > 0
                     ? <p className="text-sm text-teal-600 mt-0.5">📚 {userClassNames.join(' • ')}</p>
-                    : <p className="text-sm text-gray-400">{currentUser.email}</p>
+                    : <p className="text-sm text-gray-400">{currentUser.email || 'Tài khoản học sinh'}</p>
                   }
-                  <div className="flex gap-2 mt-1.5">
-                    <span className="px-2.5 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">✓ Đã duyệt</span>
-                    {hasClass
-                      ? <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">✓ Có lớp</span>
-                      : <span className="px-2.5 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">⚠ Chưa có lớp</span>
-                    }
+                  <div className="flex gap-2 mt-1.5 flex-wrap">
+                    <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">✓ Đã đăng nhập</span>
+                    {loginMode === 'credential' && (
+                      <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full text-xs font-medium">🔑 Tài khoản trường</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -575,12 +725,6 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
                 Đăng xuất
               </button>
             </div>
-
-            {!hasClass && (
-              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-300 rounded-xl text-sm text-yellow-800">
-                ⚠️ Bạn chưa được thêm vào lớp nào. Vui lòng liên hệ giáo viên để được thêm vào lớp.
-              </div>
-            )}
           </div>
 
           {/* Tab bar */}
@@ -610,67 +754,63 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
           {/* ── Tab: Vào thi ── */}
           {activeTab === 'join' && (
             <div className="space-y-4">
-
-              {/* Danh sách phòng thi đang mở */}
-              <div className="bg-white rounded-2xl shadow-xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                    📌 Phòng thi của bạn
-                  </h2>
-                  <button
-                    onClick={() => currentUser && fetchAvailableRooms(currentUser)}
-                    disabled={isLoadingRooms}
-                    className="text-xs text-teal-600 hover:text-teal-800 flex items-center gap-1 disabled:opacity-40"
-                  >
-                    {isLoadingRooms ? <span className="animate-spin inline-block">↻</span> : '↻'} Làm mới
-                  </button>
+              {/* Danh sách phòng thi */}
+              {hasClass && (
+                <div className="bg-white rounded-2xl shadow-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-bold text-gray-800">📌 Phòng thi của bạn</h2>
+                    <button
+                      onClick={() => currentUser && fetchAvailableRooms(currentUser)}
+                      disabled={isLoadingRooms}
+                      className="text-xs text-teal-600 hover:text-teal-800 flex items-center gap-1 disabled:opacity-40"
+                    >
+                      {isLoadingRooms ? <span className="animate-spin inline-block">↻</span> : '↻'} Làm mới
+                    </button>
+                  </div>
+                  {isLoadingRooms ? (
+                    <div className="py-8 text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-4 border-teal-500 border-t-transparent mx-auto mb-2" />
+                      <p className="text-sm text-gray-400">Đang tải...</p>
+                    </div>
+                  ) : availableRooms.length === 0 ? (
+                    <div className="py-8 text-center text-gray-400">
+                      <div className="text-4xl mb-2">🔍</div>
+                      <p className="text-sm">Không có phòng thi nào đang mở</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {availableRooms.map(room => (
+                        <RoomCard
+                          key={room.id}
+                          room={room}
+                          onJoin={() => handleJoinRoomDirect(room)}
+                          disabled={isJoining}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-
-                {isLoadingRooms ? (
-                  <div className="py-8 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-4 border-teal-500 border-t-transparent mx-auto mb-2" />
-                    <p className="text-sm text-gray-400">Đang tải...</p>
-                  </div>
-                ) : availableRooms.length === 0 ? (
-                  <div className="py-8 text-center text-gray-400">
-                    <div className="text-4xl mb-2">🔍</div>
-                    <p className="text-sm">Không có phòng thi nào đang mở cho lớp của bạn</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {availableRooms.map(room => (
-                      <RoomCard
-                        key={room.id}
-                        room={room}
-                        onJoin={() => handleJoinRoomDirect(room)}
-                        disabled={isJoining}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* Nhập mã thủ công */}
               <div className="bg-white rounded-2xl shadow-xl p-6">
-                <h2 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  🔑 Nhập mã phòng thủ công
-                </h2>
+                <h2 className="font-bold text-gray-800 mb-4">🔑 Nhập mã phòng</h2>
                 <div className="mb-4">
                   <input
                     type="text"
                     value={roomCode}
                     onChange={e => setRoomCode(e.target.value.toUpperCase())}
-                    onKeyDown={e => e.key === 'Enter' && handleJoinRoomGoogle()}
+                    onKeyDown={e => e.key === 'Enter' && handleJoinRoomWithAccount()}
                     placeholder="ABC123"
                     maxLength={6}
-                    className="w-full px-4 py-4 text-3xl text-center font-mono font-bold border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:ring-4 focus:ring-teal-200 focus:outline-none uppercase tracking-[0.3em]"
+                    className="w-full px-4 py-4 text-3xl text-center font-mono font-bold border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:outline-none uppercase tracking-[0.3em]"
                     disabled={isJoining}
                   />
                 </div>
                 <button
-                  onClick={handleJoinRoomGoogle}
-                  disabled={isJoining || !roomCode.trim() || !hasClass}
-                  className="w-full py-3 rounded-xl font-bold text-white transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  onClick={handleJoinRoomWithAccount}
+                  disabled={isJoining || !roomCode.trim()}
+                  className="w-full py-3 rounded-xl font-bold text-white transition disabled:opacity-50"
                   style={{ background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)' }}
                 >
                   {isJoining ? (
@@ -688,7 +828,6 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
           {activeTab === 'history' && (
             <StudentHistory student={currentUser} />
           )}
-
         </div>
       </div>
     );
@@ -697,7 +836,7 @@ const StudentPortal: React.FC<StudentPortalProps> = ({ onJoinRoom, onBack }) => 
   return null;
 };
 
-// ── RoomCard ──
+// ── RoomCard ──────────────────────────────────────────────
 const RoomCard: React.FC<{
   room: Room;
   onJoin: () => void;
@@ -732,7 +871,7 @@ const RoomCard: React.FC<{
         <button
           onClick={onJoin}
           disabled={disabled}
-          className="flex-shrink-0 px-4 py-2 rounded-xl font-bold text-white text-sm transition transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+          className="flex-shrink-0 px-4 py-2 rounded-xl font-bold text-white text-sm transition transform hover:scale-105 disabled:opacity-50"
           style={{ background: 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)' }}
         >
           Vào thi →
@@ -742,7 +881,7 @@ const RoomCard: React.FC<{
   );
 };
 
-// ── Google SVG icon ──
+// ── Google SVG icon ───────────────────────────────────────
 const GoogleIcon: React.FC = () => (
   <svg className="w-6 h-6" viewBox="0 0 24 24">
     <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
