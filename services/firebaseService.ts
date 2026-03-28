@@ -31,13 +31,13 @@ import { Exam, Room, Submission, StudentInfo, User, Role, Question, Class, Class
 import { calculateScore, getTotalCorrectCount, getTotalWrongCount } from './scoringService';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAcB408T-dgwVpxAKog5AUk4peZkONkWPM",
-  authDomain: "taodepdf1503.firebaseapp.com",
-  projectId: "taodepdf1503",
-  storageBucket: "taodepdf1503.firebasestorage.app",
-  messagingSenderId: "906406380218",
-  appId: "1:906406380218:web:6d22613f58942290543883",
-  measurementId: "G-9Y8ZQEX6ZB"
+  apiKey: "AIzaSyCRvlFLbwRY73ljsR34vhI8jd0yI75IDTc",
+  authDomain: "tvd-kiemtra-online.firebaseapp.com",
+  projectId: "tvd-kiemtra-online",
+  storageBucket: "tvd-kiemtra-online.firebasestorage.app",
+  messagingSenderId: "1051137068323",
+  appId: "1:1051137068323:web:736368a1cdbc039a20d096",
+  measurementId: "G-56QQZS0NP3"
 };
 
 const app = initializeApp(firebaseConfig);
