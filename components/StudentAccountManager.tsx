@@ -168,9 +168,9 @@ const StudentAccountManager: React.FC<Props> = ({ teacher, classes }) => {
   const downloadTemplate = () => {
     const ws_data = [
       ['ho_ten', 'ten_dang_nhap', 'mat_khau', 'lop'],
-      ['Nguyễn Văn An', 'nguyenvanan', 'hoc123', '10A1'],
-      ['Trần Thị Bình', 'tranthihinh', 'hoc456', '10A1'],
-      ['Lê Hoàng Cường', 'lehoangcuong', 'hoc789', '10A2'],
+      ['Nguyễn Văn An', 'nguyenvanan', 'hoc123', '3/1'],
+      ['Trần Thị Bình', 'tranthihinh', 'hoc456', '3/2'],
+      ['Lê Hoàng Cường', 'lehoangcuong', 'hoc789', '3/3'],
     ];
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
     ws['!cols'] = [{wch:22},{wch:18},{wch:12},{wch:8}];
