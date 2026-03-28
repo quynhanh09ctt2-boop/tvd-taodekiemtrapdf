@@ -195,7 +195,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
       });
 
       alert(
-        `✅ Đã tải lên đề thi thành công!\n\n` +
+        `✅ Đã tải lên đề kiểm tra thành công!\n\n` +
           `📊 Thống kê:\n` +
           `• Tổng: ${pendingMeta.total} câu hỏi\n` +
           `• Trắc nghiệm: ${pendingMeta.mc} câu\n` +
@@ -213,7 +213,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
       await loadData();
     } catch (err) {
       console.error('Create exam (with pointsConfig) error:', err);
-      alert('❌ Lỗi khi tạo đề thi.\n\n' + (err as Error).message);
+      alert('❌ Lỗi khi tạo đề kiểm tra.\n\n' + (err as Error).message);
       // Không reset để GV có thể bấm Lưu lại
     } finally {
       setIsUploading(false);
@@ -386,7 +386,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
         `${showExplanations ? '✅ Cho xem lời giải\n' : '❌ Không cho xem lời giải\n'}`;
 
       alert(
-        `✅ Đã tạo phòng thi!\n\n` +
+        `✅ Đã tạo phòng kiểm tra!\n\n` +
           `Mã phòng: ${newRoom.code}\n` +
           `${selectedClassData ? `Lớp: ${selectedClassData.name}\n` : ''}` +
           scheduleText +
@@ -398,26 +398,26 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
       loadData();
     } catch (err) {
       console.error('Create room error:', err);
-      alert('❌ Lỗi khi tạo phòng thi');
+      alert('❌ Lỗi khi tạo phòng kiểm tra');
     }
   };
 
   const handleDeleteExam = async (examId: string) => {
-    if (!confirm('Bạn có chắc muốn xóa đề thi này?')) return;
+    if (!confirm('Bạn có chắc muốn xóa đề kiểm tra này?')) return;
 
     try {
       await deleteExam(examId);
       loadData();
     } catch (err) {
       console.error('Delete exam error:', err);
-      alert('❌ Lỗi khi xóa đề thi');
+      alert('❌ Lỗi khi xóa đề kiểm tra');
     }
   };
 
   const handleRoomAction = async (roomId: string, action: 'start' | 'close' | 'delete') => {
     try {
       if (action === 'delete') {
-        if (!confirm('Bạn có chắc muốn xóa phòng thi này? Tất cả bài làm sẽ bị xóa.')) return;
+        if (!confirm('Bạn có chắc muốn xóa phòng này? Tất cả bài làm sẽ bị xóa.')) return;
         await deleteRoom(roomId);
 
         if (selectedRoom?.id === roomId) {
@@ -432,7 +432,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
       loadData();
     } catch (err) {
       console.error('Room action error:', err);
-      alert('❌ Lỗi thao tác phòng thi');
+      alert('❌ Lỗi thao tác phòng kiểm tra');
     }
   };
 
@@ -517,7 +517,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
               <div>
                 {/* Upload Button */}
                 <div className="bg-white rounded-2xl p-6 shadow-lg mb-6">
-                  <h3 className="font-bold text-gray-800 mb-4">📤 Tải lên đề thi mới (Môn Toán)</h3>
+                  <h3 className="font-bold text-gray-800 mb-4">📤 Tải lên đề kiểm tra mới</h3>
                   <p className="text-sm text-gray-500 mb-4">
                     Hỗ trợ file Word (.docx) với công thức LaTeX ($...$) và 3 loại câu hỏi: Trắc nghiệm, Đúng/Sai, Trả lời
                     ngắn
@@ -566,7 +566,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
                   {exams.length === 0 ? (
                     <div className="bg-white rounded-2xl p-12 text-center">
                       <div className="text-6xl mb-4">📝</div>
-                      <p className="text-gray-500">Chưa có đề thi nào. Hãy tải lên đề thi đầu tiên!</p>
+                      <p className="text-gray-500">Chưa có đề kiểm tra nào. Hãy tải lên đề kiểm tra đầu tiên!</p>
                     </div>
                   ) : (
                     exams.map((exam) => {
@@ -639,7 +639,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
                 {rooms.length === 0 ? (
                   <div className="bg-white rounded-2xl p-12 text-center">
                     <div className="text-6xl mb-4">🏠</div>
-                    <p className="text-gray-500">Chưa có phòng thi nào. Tạo phòng từ đề thi!</p>
+                    <p className="text-gray-500">Chưa có phòng kiểm tra nào. Tạo phòng từ đề kiểm tra!</p>
                   </div>
                 ) : (
                   rooms.map((room) => (
@@ -1040,7 +1040,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
                     await createExam(examData as any);
                     setShowPDFCreator(false);
                     await loadData();
-                    alert('✅ Đã lưu đề thi PDF thành công!');
+                    alert('✅ Đã lưu đề kiểm tra PDF thành công!');
                   } catch (err) {
                     console.error('Create PDF exam error:', err);
                     alert('❌ Lỗi khi lưu đề thi: ' + (err as Error).message);
@@ -1059,10 +1059,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
       {showCreateRoom && selectedExamForRoom && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl my-8">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">🏠 Tạo phòng thi</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-4">🏠 Tạo phòng làm bài</h3>
 
             <div className="bg-teal-50 rounded-xl p-4 mb-4">
-              <p className="text-sm text-teal-600">Đề thi:</p>
+              <p className="text-sm text-teal-600">Đề kiểm tra:</p>
               <p className="font-bold text-teal-900">{selectedExamForRoom.title}</p>
               <p className="text-sm text-teal-600">{selectedExamForRoom.questions.length} câu hỏi</p>
             </div>
@@ -1106,7 +1106,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
                 />
                 <div className="flex-1">
                   <div className="font-semibold text-gray-900">⏰ Hẹn giờ mở/đóng phòng</div>
-                  <div className="text-xs text-gray-600 mt-0.5">Nếu bật, học sinh chỉ thi trong khoảng thời gian này</div>
+                  <div className="text-xs text-gray-600 mt-0.5">Nếu bật, học sinh chỉ làm bài trong khoảng thời gian này</div>
                 </div>
               </label>
 
@@ -1137,7 +1137,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
               )}
             </div>
 
-            {/* ✅ Cho phép thi tự do */}
+            {/* ✅ Cho phép làm bài tự do */}
             <div className="mb-4">
               <label className="flex items-center gap-3 cursor-pointer p-3 bg-orange-50 border-2 border-orange-200 rounded-xl hover:bg-orange-100 transition">
                 <input
@@ -1147,8 +1147,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
                   className="w-5 h-5 accent-orange-500"
                 />
                 <div className="flex-1">
-                  <div className="font-semibold text-gray-900">🆓 Cho phép thi tự do</div>
-                  <div className="text-xs text-gray-600 mt-0.5">Học sinh có thể thi mà không cần đăng nhập Google</div>
+                  <div className="font-semibold text-gray-900">🆓 Cho phép làm bài tự do</div>
+                  <div className="text-xs text-gray-600 mt-0.5">Học sinh có thể làm bài mà không cần đăng nhập Google</div>
                 </div>
               </label>
             </div>
@@ -1222,7 +1222,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
                 type="text"
                 value={newClassName}
                 onChange={(e) => setNewClassName(e.target.value)}
-                placeholder="VD: 10A1, Toán 11, ..."
+                placeholder="VD: 3/1, Tin học 3/1, ..."
                 className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:outline-none"
               />
             </div>
@@ -1235,9 +1235,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
                 className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:outline-none"
               >
                 <option value="">-- Chọn khối --</option>
-                <option value="10">Khối 10</option>
-                <option value="11">Khối 11</option>
-                <option value="12">Khối 12</option>
+                <option value="10">Khối 3</option>
+                <option value="11">Khối 4</option>
+                <option value="12">Khối 5</option>
               </select>
             </div>
 
