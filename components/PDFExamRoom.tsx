@@ -1,5 +1,5 @@
 // src/components/PDFExamRoom.tsx
-// Phòng thi dạng PDF: bên trái = PDF (iframe Drive hoặc base64), bên phải = ô trả lời
+// Phòng kiểm tra dạng PDF: bên trái = PDF (iframe Drive hoặc base64), bên phải = ô trả lời
 // ✅ CẢI TIẾN: Ưu tiên Google Drive iframe; hiển thị link PDF sau khi nộp bài
 //
 // CHANGELOG:
