@@ -3,8 +3,8 @@
 // ✅ Không cần Google Cloud Console, không cần OAuth popup
 
 // ─── ⚙️ CẤU HÌNH — SỬA 2 DÒNG NÀY ────────────────────────────────────────────
-const GAS_URL          = 'https://script.google.com/macros/s/AKfycbzmsM_sOioVyrYCEecEcmWp7fMfJvqLLgMHLJ1CbVAndYuNFyr-PXJct7T2CtLNACKg/exec';
-const GAS_SECRET_TOKEN = 'ĐekiemtraPDF'; // phải khớp với CONFIG.secretToken trong Code.gs
+const GAS_URL          = 'https://script.google.com/macros/s/AKfycbxZROekIusZcSUOAoGcuZlPe4pji62N4dGoT8KwxSm2FBKLM8XbyEavP1jxD31BdFtE/exec';
+const GAS_SECRET_TOKEN = 'kiemtraonline'; // phải khớp với CONFIG.secretToken trong Code.gs
 // ───────────────────────────────────────────────────────────────────────────────
 
 export interface DriveUploadResult {
