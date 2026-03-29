@@ -1,7 +1,7 @@
 // ============================================================
 // StudentAccountManager.tsx
 // Component quản lý tài khoản học sinh trong TeacherDashboard
-// Đã điều chỉnh: Ép kiểu dữ liệu an toàn & fix lỗi hiển thị nút
+// Đặt tại: src/components/StudentAccountManager.tsx
 // ============================================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -17,6 +17,7 @@ import {
 } from '../services/studentAccountService';
 import * as XLSX from 'xlsx';
 
+// Aliases cho ngắn gọn
 type CreateStudentInput = CreateStudentAccountInput;
 type BulkImportRow      = BulkImportStudentRow;
 
@@ -41,30 +42,36 @@ const StudentAccountManager: React.FC<Props> = ({ teacher, classes }) => {
     className: '',
     teacherId: teacher.id,
   });
-  const [formError, setFormError] = useState<string>('');
+  const [formError, setFormError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [createSuccess, setCreateSuccess] = useState('');
 
-  // Import state
-  const [file, setFile] = useState<File | null>(null);
-  const [importData, setImportData] = useState<BulkImportRow[]>([]);
-  const [isImporting, setIsImporting] = useState(false);
+  // Import
+  const [importRows, setImportRows] = useState<BulkImportRow[]>([]);
+  const [importClassId, setImportClassId] = useState('');
   const [importResult, setImportResult] = useState<BulkImportResult | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Reset password state
+  // Reset password modal
   const [resetTarget, setResetTarget] = useState<StudentAccount | null>(null);
   const [resetPwd, setResetPwd] = useState('');
   const [isResetting, setIsResetting] = useState(false);
 
+  // Search / filter
+  const [search, setSearch] = useState('');
+  const [filterClass, setFilterClass] = useState('');
+
   useEffect(() => {
     loadAccounts();
-  }, [teacher.id]);
+  }, []);
 
   const loadAccounts = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const data = await getStudentAccountsByTeacher(teacher.id);
-      setAccounts(data);
+      const list = await getStudentAccountsByTeacher(teacher.id);
+      list.sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+      setAccounts(list);
     } catch (err) {
       console.error(err);
     } finally {
@@ -72,291 +79,282 @@ const StudentAccountManager: React.FC<Props> = ({ teacher, classes }) => {
     }
   };
 
-  const handleCreateAccount = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // ─── CREATE ───────────────────────────────────────────────
+
+  const handleCreate = async () => {
     setFormError('');
+    setCreateSuccess('');
 
-    if (!form.username || !form.password || !form.name) {
-      setFormError('Vui lòng điền đầy đủ thông tin bắt buộc.');
-      return;
-    }
+    if (!form.name.trim()) return setFormError('Vui lòng nhập họ tên.');
+    if (!form.username.trim()) return setFormError('Vui lòng nhập tên đăng nhập.');
+    if (!isValidUsername(form.username)) return setFormError('Tên đăng nhập chỉ dùng chữ cái, số, dấu _ (3-30 ký tự).');
+    if (!form.password || form.password.length < 4) return setFormError('Mật khẩu ít nhất 4 ký tự.');
 
-    if (!isValidUsername(form.username)) {
-      setFormError('Tên đăng nhập không hợp lệ (3-20 ký tự, chỉ chữ cái, số, gạch dưới).');
-      return;
-    }
-
+    setIsCreating(true);
     try {
-      setIsCreating(true);
-      await createStudentAccount(form);
-      setForm({
-        username: '',
-        password: '',
-        name: '',
-        classId: '',
-        className: '',
+      const selectedClass = classes.find(c => c.id === form.classId);
+      await createStudentAccount({
+        ...form,
+        username: form.username.trim().toLowerCase(),
+        name: form.name.trim(),
+        className: selectedClass?.name || form.className,
         teacherId: teacher.id,
       });
-      setActiveTab('list');
-      loadAccounts();
+      setCreateSuccess(`✅ Đã tạo tài khoản "${form.username.toLowerCase()}" thành công!`);
+      setForm({ username: '', password: '', name: '', classId: '', className: '', teacherId: teacher.id });
+      await loadAccounts();
     } catch (err: any) {
-      setFormError(err.message || 'Lỗi khi tạo tài khoản');
+      setFormError(err.message);
     } finally {
       setIsCreating(false);
     }
   };
 
+  // ─── IMPORT EXCEL ─────────────────────────────────────────
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-    setFile(selectedFile);
-    setImportResult(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const bstr = evt.target?.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
+        const data = evt.target?.result;
+        const wb = XLSX.read(data, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
 
-        // Ép kiểu String an toàn cho từng trường dữ liệu
-        const formattedData: BulkImportRow[] = data.map((row: any) => ({
-          username: String(row.username || row['Tên đăng nhập'] || row['Mã học sinh'] || row['username'] || '').trim(),
-          password: String(row.password || row['Mật khẩu'] || '123456').trim(),
-          name: String(row.name || row['Họ và tên'] || row['ho_ten'] || row['Họ tên'] || '').trim(),
-          className: String(row.className || row['Lớp'] || row['class_name'] || row['Lớp học'] || '').trim()
-        })).filter(item => item.username !== '' && item.name !== '');
+        // Map các tên cột linh hoạt
+        const parsed: BulkImportRow[] = rows.map(r => ({
+          name: r['ho_ten'] || r['Họ tên'] || r['ho ten'] || r['name'] || '',
+          username: String(r['ten_dang_nhap'] || r['Tên đăng nhập'] || r['username'] || ''),
+          password: String(r['mat_khau'] || r['Mật khẩu'] || r['password'] || ''),
+          className: r['lop'] || r['Lớp'] || r['class'] || '',
+        })).filter(r => r.name || r.username); // bỏ dòng trống
 
-        setImportData(formattedData);
-        if (formattedData.length === 0) {
-          setFormError("Không tìm thấy dữ liệu học sinh hợp lệ trong file.");
-        } else {
-          setFormError("");
-        }
+        setImportRows(parsed);
+        setImportResult(null);
       } catch (err) {
-        setFormError("Lỗi định dạng file Excel.");
+        alert('❌ Không đọc được file. Vui lòng dùng file Excel (.xlsx) theo mẫu.');
       }
     };
-    reader.readAsBinaryString(selectedFile);
+    reader.readAsBinaryString(file);
   };
 
-  const handleBulkImport = async () => {
-    if (importData.length === 0) return;
+  const handleImport = async () => {
+    if (importRows.length === 0) return;
+    setIsImporting(true);
+    setImportResult(null);
     try {
-      setIsImporting(true);
-      setFormError('');
-      const result = await bulkCreateStudentAccounts(teacher.id, importData, classes);
+      const result = await bulkCreateStudentAccounts(
+        importRows,
+        teacher.id,
+        classes,                  // ✅ pass toàn bộ danh sách lớp để validate
+        importClassId || undefined // lớp mặc định khi cột "lop" trống
+      );
       setImportResult(result);
-      setFile(null);
-      setImportData([]);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      loadAccounts();
+      if (result.success > 0) {
+        await loadAccounts();
+        setImportRows([]);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
     } catch (err: any) {
-      setFormError(String(err.message || "Lỗi khi nhập danh sách"));
+      alert('❌ Lỗi import: ' + err.message);
     } finally {
       setIsImporting(false);
     }
   };
 
-  const handleDeleteAccount = async (id: string, name: string) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa tài khoản của học sinh ${name}?`)) return;
-    try {
-      await deleteStudentAccount(id);
-      loadAccounts();
-    } catch (err) {
-      alert('Lỗi khi xóa tài khoản');
-    }
+  const downloadTemplate = () => {
+    const ws_data = [
+      ['ho_ten', 'ten_dang_nhap', 'mat_khau', 'lop'],
+      ['Nguyễn Văn An', 'NguyenVanAn', 'hoc123', '3/1'],
+      ['Trần Thị Bình', 'TranThiBinh', 'hoc456', '3/2'],
+      ['Lê Hoàng Cường', 'LeHoangCuong', 'hoc789', '3/3'],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    ws['!cols'] = [{wch:22},{wch:18},{wch:12},{wch:8}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'DanhSachHocSinh');
+    XLSX.writeFile(wb, 'ds_hocsinh_mau.xlsx');
   };
 
-  const handleToggleStatus = async (account: StudentAccount) => {
-    try {
-      await toggleStudentAccountStatus(account.id, !account.isApproved);
-      loadAccounts();
-    } catch (err) {
-      alert('Lỗi khi cập nhật trạng thái');
-    }
-  };
+  // ─── RESET PASSWORD ───────────────────────────────────────
 
   const handleResetPassword = async () => {
-    if (!resetTarget || resetPwd.length < 4) return;
+    if (!resetTarget || !resetPwd) return;
+    setIsResetting(true);
     try {
-      setIsResetting(true);
-      await resetStudentPassword(resetTarget.id, resetPwd);
+      await resetStudentPassword(resetTarget.username, resetPwd);
+      alert(`✅ Đặt lại mật khẩu cho "${resetTarget.name}" thành công!`);
       setResetTarget(null);
       setResetPwd('');
-      alert('Đã đổi mật khẩu thành công');
-    } catch (err) {
-      alert('Lỗi khi đổi mật khẩu');
+    } catch (err: any) {
+      alert('❌ ' + err.message);
     } finally {
       setIsResetting(false);
     }
   };
 
-  const renderImportTab = () => (
-    <div className="space-y-6 animate-fadeIn">
-      <div className="bg-white p-8 rounded-3xl border-2 border-dashed border-teal-200 text-center">
-        <div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-4xl">📊</span>
-        </div>
-        <h3 className="text-xl font-bold text-gray-900 mb-2">Nhập danh sách từ Excel</h3>
-        <p className="text-gray-500 mb-6 max-w-md mx-auto">
-          Tải file Excel chứa các cột: <b>Họ và tên, Tên đăng nhập, Mật khẩu, Lớp</b>.
-        </p>
-        
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          accept=".xlsx, .xls"
-          className="hidden"
-          id="excel-upload"
-        />
-        <label
-          htmlFor="excel-upload"
-          className="inline-flex items-center px-6 py-3 bg-white border-2 border-teal-500 text-teal-600 font-bold rounded-2xl hover:bg-teal-50 transition cursor-pointer shadow-sm"
-        >
-          {file ? '📄 Đổi tệp khác' : '📁 Chọn tệp từ máy tính'}
-        </label>
+  // ─── DELETE ───────────────────────────────────────────────
 
-        {file && (
-          <div className="mt-8 p-5 bg-teal-50 rounded-2xl border-2 border-teal-100 text-left">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1">
-                <p className="font-bold text-teal-900">📍 File đã chọn: {file.name}</p>
-                <p className="text-sm text-teal-700 mt-1">
-                  {importData.length > 0 
-                    ? `Phát hiện ${importData.length} dòng dữ liệu hợp lệ.` 
-                    : "⚠️ Không tìm thấy dữ liệu hợp lệ. Vui lòng kiểm tra tiêu đề cột."}
-                </p>
-              </div>
-              <button
-                onClick={handleBulkImport}
-                disabled={isImporting || importData.length === 0}
-                className="px-8 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-lg transition disabled:opacity-50 whitespace-nowrap"
-              >
-                {isImporting ? '⏳ Đang tải...' : '🚀 Tải lên ngay'}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+  const handleDelete = async (account: StudentAccount) => {
+    if (!confirm(`Xóa tài khoản "${account.name}" (@${account.username})?\n\nHành động này không thể hoàn tác.`)) return;
+    try {
+      await deleteStudentAccount(account.username);
+      setAccounts(prev => prev.filter(a => a.username !== account.username));
+    } catch (err: any) {
+      alert('❌ ' + err.message);
+    }
+  };
 
-      {importResult && (
-        <div className="p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl">
-          <p className="font-bold text-blue-900">Kết quả nhập dữ liệu:</p>
-          <ul className="text-sm text-blue-800 mt-1 list-disc list-inside">
-            <li>Thành công: {importResult.success}</li>
-            <li>Thất bại: {importResult.failed}</li>
-          </ul>
-          {importResult.errors.length > 0 && (
-            <div className="mt-2 text-xs text-red-600 bg-white p-2 rounded-lg max-h-32 overflow-y-auto">
-              {importResult.errors.map((err, i) => <p key={i}>- {err}</p>)}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+  // ─── TOGGLE STATUS ────────────────────────────────────────
+
+  const handleToggle = async (account: StudentAccount) => {
+    try {
+      await toggleStudentAccountStatus(account.username, !account.isActive);
+      setAccounts(prev => prev.map(a =>
+        a.username === account.username ? { ...a, isActive: !a.isActive } : a
+      ));
+    } catch (err: any) {
+      alert('❌ ' + err.message);
+    }
+  };
+
+  // ─── FILTERED LIST ────────────────────────────────────────
+
+  const filtered = accounts.filter(a => {
+    const matchSearch = !search ||
+      a.name.toLowerCase().includes(search.toLowerCase()) ||
+      a.username.includes(search.toLowerCase());
+    const matchClass = !filterClass || a.classId === filterClass || a.className === filterClass;
+    return matchSearch && matchClass;
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════
 
   return (
-    <div className="bg-gray-50/50 rounded-3xl p-2 md:p-6 min-h-[500px]">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
-            <span className="p-2 bg-teal-600 text-white rounded-xl shadow-lg shadow-teal-200">👥</span>
-            Quản lý tài khoản học sinh
-          </h2>
-          <p className="text-gray-500 text-sm mt-1">Cấp tài khoản định danh cho học sinh làm bài thi</p>
+          <h2 className="text-xl font-bold text-gray-900">🔑 Tài khoản Học sinh</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Tạo & quản lý tài khoản đăng nhập cho học sinh
+          </p>
         </div>
-
-        <div className="inline-flex p-1.5 bg-white rounded-2xl shadow-sm border border-gray-100">
-          <button
-            onClick={() => setActiveTab('list')}
-            className={`px-5 py-2.5 rounded-xl font-bold transition ${activeTab === 'list' ? 'bg-teal-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
-          >
-            Danh sách
-          </button>
-          <button
-            onClick={() => setActiveTab('create')}
-            className={`px-5 py-2.5 rounded-xl font-bold transition ${activeTab === 'create' ? 'bg-teal-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
-          >
-            Tạo mới
-          </button>
-          <button
-            onClick={() => setActiveTab('import')}
-            className={`px-5 py-2.5 rounded-xl font-bold transition ${activeTab === 'import' ? 'bg-teal-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
-          >
-            Nhập Excel
-          </button>
-        </div>
+        <span className="bg-teal-100 text-teal-800 text-sm font-semibold px-3 py-1 rounded-full">
+          {accounts.length} tài khoản
+        </span>
       </div>
 
-      {formError && (
-        <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-xl flex items-center gap-3 animate-shake">
-          <span>⚠️</span>
-          <p className="font-medium text-sm">{String(formError)}</p>
-        </div>
-      )}
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+        {([
+          { key: 'list', label: '📋 Danh sách' },
+          { key: 'create', label: '➕ Tạo mới' },
+          { key: 'import', label: '📤 Import Excel' },
+        ] as { key: Tab; label: string }[]).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition ${
+              activeTab === t.key
+                ? 'bg-white text-teal-700 shadow'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
+      {/* ── TAB: LIST ────────────────────────────────────────── */}
       {activeTab === 'list' && (
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="space-y-4">
+          {/* Filters */}
+          <div className="flex gap-3">
+            <input
+              type="text"
+              placeholder="🔍 Tìm tên hoặc username..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+            />
+            <select
+              value={filterClass}
+              onChange={e => setFilterClass(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+            >
+              <option value="">Tất cả lớp</option>
+              {classes.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <button
+              onClick={loadAccounts}
+              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium transition"
+            >
+              🔄
+            </button>
+          </div>
+
           {isLoading ? (
-            <div className="p-20 text-center text-gray-400">Đang tải dữ liệu...</div>
-          ) : accounts.length === 0 ? (
-            <div className="p-20 text-center">
-               <div className="text-6xl mb-4">📭</div>
-               <p className="text-gray-500 font-medium">Chưa có tài khoản nào được tạo.</p>
+            <div className="text-center py-10 text-gray-500">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-3" />
+              Đang tải...
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-14 text-gray-400">
+              <div className="text-5xl mb-3">👤</div>
+              <p className="font-medium">Chưa có tài khoản học sinh nào</p>
+              <p className="text-sm mt-1">Tạo mới hoặc import từ Excel</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="px-6 py-4 font-bold text-gray-600 text-sm uppercase tracking-wider">Học sinh</th>
-                    <th className="px-6 py-4 font-bold text-gray-600 text-sm uppercase tracking-wider">Tên đăng nhập</th>
-                    <th className="px-6 py-4 font-bold text-gray-600 text-sm uppercase tracking-wider">Lớp</th>
-                    <th className="px-6 py-4 font-bold text-gray-600 text-sm uppercase tracking-wider">Trạng thái</th>
-                    <th className="px-6 py-4 font-bold text-gray-600 text-sm uppercase tracking-wider text-right">Thao tác</th>
+            <div className="overflow-hidden border border-gray-200 rounded-xl">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Họ tên</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tài khoản</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Lớp</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Trạng thái</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {accounts.map(acc => (
-                    <tr key={acc.id} className="hover:bg-teal-50/30 transition group">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center font-bold">
-                            {acc.name.charAt(0).toUpperCase()}
-                          </div>
-                          <span className="font-bold text-gray-900">{acc.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 font-mono text-sm text-gray-600">@{acc.username}</td>
-                      <td className="px-6 py-4">
-                        <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-bold">
-                          {acc.className || 'Chưa xếp'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <button 
-                          onClick={() => handleToggleStatus(acc)}
-                          className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${acc.isApproved ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {filtered.map(acc => (
+                    <tr key={acc.username} className="hover:bg-gray-50 transition">
+                      <td className="px-4 py-3 font-medium text-gray-800">{acc.name}</td>
+                      <td className="px-4 py-3 font-mono text-teal-700">@{acc.username}</td>
+                      <td className="px-4 py-3 text-gray-500">{acc.className || '—'}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => handleToggle(acc)}
+                          className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            acc.isActive
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}
                         >
-                          {acc.isApproved ? '● Đang hoạt động' : '● Chờ duyệt'}
+                          {acc.isActive ? '✅ Hoạt động' : '🚫 Tắt'}
                         </button>
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition">
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
                           <button
-                            onClick={() => setResetTarget(acc)}
-                            className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg title='Đổi mật khẩu'"
+                            onClick={() => { setResetTarget(acc); setResetPwd(''); }}
+                            className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-2 py-1 rounded font-medium transition"
+                            title="Đặt lại mật khẩu"
                           >
-                            🔑
+                            🔑 Mật khẩu
                           </button>
                           <button
-                            onClick={() => handleDeleteAccount(acc.id, acc.name)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg title='Xóa tài khoản'"
+                            onClick={() => handleDelete(acc)}
+                            className="text-xs bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1 rounded font-medium transition"
+                            title="Xóa tài khoản"
                           >
                             🗑️
                           </button>
@@ -371,100 +369,265 @@ const StudentAccountManager: React.FC<Props> = ({ teacher, classes }) => {
         </div>
       )}
 
+      {/* ── TAB: CREATE ──────────────────────────────────────── */}
       {activeTab === 'create' && (
-        <div className="max-w-xl mx-auto bg-white p-8 rounded-3xl shadow-sm border border-gray-100 animate-fadeIn">
-          <form onSubmit={handleCreateAccount} className="space-y-5">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Họ và tên học sinh *</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={e => setForm({ ...form, name: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-gray-100 rounded-2xl focus:border-teal-500 focus:outline-none transition"
-                placeholder="Nguyễn Văn A"
-              />
+        <div className="max-w-md space-y-5">
+          {createSuccess && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-xl text-green-800 text-sm font-medium">
+              {createSuccess}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Tên đăng nhập *</label>
-                <input
-                  type="text"
-                  value={form.username}
-                  onChange={e => setForm({ ...form, username: e.target.value.toLowerCase() })}
-                  className="w-full px-4 py-3 border-2 border-gray-100 rounded-2xl focus:border-teal-500 focus:outline-none transition font-mono"
-                  placeholder="van_a_123"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Mật khẩu *</label>
-                <input
-                  type="text"
-                  value={form.password}
-                  onChange={e => setForm({ ...form, password: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-100 rounded-2xl focus:border-teal-500 focus:outline-none transition"
-                  placeholder="******"
-                />
-              </div>
+          )}
+          {formError && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+              ❌ {formError}
             </div>
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">Chọn lớp học</label>
-              <select
-                value={form.classId}
-                onChange={e => {
-                  const cls = classes.find(c => c.id === e.target.value);
-                  setForm({ ...form, classId: e.target.value, className: cls?.name || '' });
-                }}
-                className="w-full px-4 py-3 border-2 border-gray-100 rounded-2xl focus:border-teal-500 focus:outline-none transition appearance-none"
-              >
-                <option value="">-- Không xếp lớp --</option>
-                {classes.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="submit"
-              disabled={isCreating}
-              className="w-full py-4 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-2xl shadow-lg shadow-teal-100 transition transform hover:scale-[1.02] disabled:opacity-50"
+          )}
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Họ và tên <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm((f: CreateStudentInput) => ({ ...f, name: e.target.value }))}
+              placeholder="Nguyễn Văn An"
+              className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Tên đăng nhập <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={form.username}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm((f: CreateStudentInput) => ({ ...f, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') }))}
+              placeholder="nguyenvanan"
+              className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:outline-none font-mono"
+            />
+            <p className="text-xs text-gray-400 mt-1">Chỉ chữ cái thường, số, dấu _ (3-30 ký tự)</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Mật khẩu <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={form.password}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm((f: CreateStudentInput) => ({ ...f, password: e.target.value }))}
+              placeholder="Tối thiểu 4 ký tự"
+              className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:outline-none font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Lớp học
+            </label>
+            <select
+              value={form.classId}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setForm((f: CreateStudentInput) => ({ ...f, classId: e.target.value }))}
+              className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:outline-none"
             >
-              {isCreating ? 'Đang tạo...' : 'TẠO TÀI KHOẢN'}
-            </button>
-          </form>
+              <option value="">— Không chọn lớp —</option>
+              {classes.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={handleCreate}
+            disabled={isCreating}
+            className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isCreating ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                Đang tạo...
+              </>
+            ) : '➕ Tạo tài khoản'}
+          </button>
         </div>
       )}
 
-      {activeTab === 'import' && renderImportTab()}
-
-      {/* Modal Đặt lại mật khẩu */}
-      {resetTarget && (
-        <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm space-y-6 animate-scaleIn">
-            <div className="text-center">
-               <div className="w-16 h-16 bg-teal-50 text-teal-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">🔑</div>
-               <h3 className="text-xl font-bold text-gray-900">Đổi mật khẩu</h3>
-               <p className="text-sm text-gray-500 mt-1">
-                 Tài khoản: <span className="font-bold text-teal-600">@{resetTarget.username}</span>
-               </p>
+      {/* ── TAB: IMPORT ──────────────────────────────────────── */}
+      {activeTab === 'import' && (
+        <div className="space-y-5">
+          {/* Download template */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-blue-800 text-sm">📄 File Excel mẫu</p>
+              <p className="text-xs text-blue-600 mt-0.5">
+                Cột: <code className="bg-blue-100 px-1 rounded">ho_ten</code>,{' '}
+                <code className="bg-blue-100 px-1 rounded">ten_dang_nhap</code>,{' '}
+                <code className="bg-blue-100 px-1 rounded">mat_khau</code>,{' '}
+                <code className="bg-blue-100 px-1 rounded">lop</code>
+              </p>
             </div>
+            <button
+              onClick={downloadTemplate}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition flex items-center gap-2"
+            >
+              ⬇️ Tải mẫu
+            </button>
+          </div>
+
+          {/* ⚠️ Cảnh báo yêu cầu tạo lớp trước */}
+          {classes.length === 0 ? (
+            <div className="p-4 bg-red-50 border border-red-300 rounded-xl">
+              <p className="text-sm font-semibold text-red-800">⚠️ Chưa có lớp nào!</p>
+              <p className="text-xs text-red-600 mt-1">
+                Nếu file Excel có cột <strong>lop</strong>, bạn phải tạo lớp trước trong tab <strong>Lớp học</strong>.
+                Nếu để trống cột lớp, import vẫn hoạt động bình thường.
+              </p>
+            </div>
+          ) : (
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-xl">
+              <p className="text-xs text-yellow-800">
+                ⚠️ Tên lớp trong cột <code className="bg-yellow-100 px-1 rounded">lop</code> phải
+                <strong> khớp chính xác</strong> với lớp đã tạo. Lớp hiện có:{' '}
+                {classes.map(c => (
+                  <code key={c.id} className="bg-yellow-100 px-1 rounded mr-1">{c.name}</code>
+                ))}
+              </p>
+            </div>
+          )}
+
+          {/* File picker */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Chọn file Excel (.xlsx)
+            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileChange}
+              className="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-teal-50 file:text-teal-700 file:font-semibold hover:file:bg-teal-100"
+            />
+          </div>
+
+          {/* Gán lớp mặc định */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Gán vào lớp <span className="text-gray-400 font-normal">(áp dụng khi cột "lop" trống)</span>
+            </label>
+            <select
+              value={importClassId}
+              onChange={e => setImportClassId(e.target.value)}
+              className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:outline-none"
+            >
+              <option value="">— Không chọn —</option>
+              {classes.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Preview */}
+          {importRows.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-700">
+                  Đọc được <span className="text-teal-700">{importRows.length}</span> học sinh
+                </p>
+                <button
+                  onClick={() => { setImportRows([]); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                  className="text-xs text-red-500 hover:text-red-700"
+                >
+                  ✕ Xóa
+                </button>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-xl">
+                <table className="min-w-full text-xs divide-y divide-gray-100">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-gray-500">#</th>
+                      <th className="px-3 py-2 text-left text-gray-500">Họ tên</th>
+                      <th className="px-3 py-2 text-left text-gray-500">Tài khoản</th>
+                      <th className="px-3 py-2 text-left text-gray-500">Lớp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {importRows.map((r, i) => (
+                      <tr key={i}>
+                        <td className="px-3 py-2 text-gray-400">{i+1}</td>
+                        <td className="px-3 py-2 text-gray-800">{r.name}</td>
+                        <td className="px-3 py-2 font-mono text-teal-700">@{r.username}</td>
+                        <td className="px-3 py-2 text-gray-500">{r.className || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <button
+                onClick={handleImport}
+                disabled={isImporting}
+                className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isImporting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                    Đang import...
+                  </>
+                ) : `📤 Import ${importRows.length} học sinh`}
+              </button>
+            </div>
+          )}
+
+          {/* Result */}
+          {importResult && (
+            <div className={`p-4 rounded-xl border ${importResult.failed === 0 ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'}`}>
+              <p className="font-semibold text-gray-800 mb-2">Kết quả Import</p>
+              <p className="text-sm text-green-700">✅ Thành công: {importResult.success}</p>
+              {importResult.failed > 0 && (
+                <>
+                  <p className="text-sm text-red-700">❌ Thất bại: {importResult.failed}</p>
+                  <ul className="mt-2 space-y-1">
+                    {importResult.errors.map((errMsg: string, i: number) => (
+                      <li key={i} className="text-xs text-red-600">• {errMsg}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── RESET PASSWORD MODAL ─────────────────────────────── */}
+      {resetTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm space-y-4">
+            <h3 className="text-lg font-bold text-gray-900">🔑 Đặt lại mật khẩu</h3>
+            <p className="text-sm text-gray-600">
+              Tài khoản: <strong>{resetTarget.name}</strong> (@{resetTarget.username})
+            </p>
             <input
               type="text"
               value={resetPwd}
               onChange={e => setResetPwd(e.target.value)}
-              placeholder="Mật khẩu mới (ít nhất 4 ký tự)"
-              className="w-full px-4 py-3 border-2 border-gray-100 rounded-2xl focus:border-teal-500 focus:outline-none font-mono text-center text-lg"
+              placeholder="Mật khẩu mới (tối thiểu 4 ký tự)"
+              className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:outline-none font-mono"
               autoFocus
             />
             <div className="flex gap-3">
               <button
                 onClick={() => { setResetTarget(null); setResetPwd(''); }}
-                className="flex-1 py-3 border-2 border-gray-100 rounded-xl font-bold text-gray-500 hover:bg-gray-50 transition"
+                className="flex-1 py-2.5 border-2 border-gray-300 rounded-xl font-semibold hover:bg-gray-50 transition"
               >
                 Hủy
               </button>
               <button
                 onClick={handleResetPassword}
                 disabled={isResetting || resetPwd.length < 4}
-                className="flex-1 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition disabled:opacity-50"
+                className="flex-1 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-xl transition disabled:opacity-50"
               >
                 {isResetting ? '...' : 'Xác nhận'}
               </button>
