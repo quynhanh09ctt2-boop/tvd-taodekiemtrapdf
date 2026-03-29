@@ -1235,9 +1235,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onLogout }) =
                 className="w-full p-3 border-2 border-gray-300 rounded-xl focus:border-teal-500 focus:outline-none"
               >
                 <option value="">-- Chọn khối --</option>
-                <option value="10">Khối 3</option>
-                <option value="11">Khối 4</option>
-                <option value="12">Khối 5</option>
+                <option value="3">Khối 3</option>
+                <option value="4">Khối 4</option>
+                <option value="5">Khối 5</option>
               </select>
             </div>
 
