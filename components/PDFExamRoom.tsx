@@ -10,6 +10,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Room, Exam, StudentInfo, Submission, ScoreBreakdown } from '../types';
 import {
+  auth,
   ensureSignedIn,
   createSubmission,
   submitExam,
@@ -178,11 +179,19 @@ const PDFExamRoom: React.FC<PDFExamRoomProps> = ({
     if (existingSubmissionId) return;
     const init = async () => {
       await ensureSignedIn();
+
+      // ✅ FIX: student.id PHẢI = auth.uid để Firestore update rule hoạt động
+      // (Giống cách ExamRoom.tsx xử lý — tránh mismatch với credential login)
+      const uid = auth.currentUser?.uid;
+      if (!uid) throw new Error('Auth missing — không có Firebase UID');
+
+      const fixedStudent = { ...student, id: uid };
+
       const id = await createSubmission({
         roomId:    room.id,
         roomCode:  room.code,
         examId:    exam.id,
-        student,
+        student:   fixedStudent,
         answers:   {},
         scoreBreakdown: {
           multipleChoice: { total: 0, correct: 0, points: 0 },
@@ -197,7 +206,11 @@ const PDFExamRoom: React.FC<PDFExamRoomProps> = ({
       });
       setSubmissionId(id);
     };
-    init().catch(console.error);
+    init().catch((err) => {
+      console.error('PDFExamRoom init error:', err);
+      // Hiển thị lỗi rõ hơn để dễ debug
+      alert('Không thể tạo phiên thi: ' + (err?.message || err));
+    });
   }, []);
 
   // ─── Timer ────────────────────────────────────────────────────────────────
